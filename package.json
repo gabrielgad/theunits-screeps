@@ -1,0 +1,12 @@
+{
+    "name": "screeps-bot",
+    "version": "1.0.0",
+    "description": "Personal Screeps bot",
+    "main": "src/main.js",
+    "scripts": {
+      "sync": "robocopy \"src\" \"%APPDATA%\\Local\\Screeps\\scripts\\screeps_newbieland_net___21025\\default\" /MIR"
+    },
+    "keywords": ["screeps"],
+    "author": "",
+    "license": "ISC"
+  }
