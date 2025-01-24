@@ -1,4 +1,3 @@
-const EnergyStateMachine = require('EnergyStateMachine');
 const BuildingStateMachine = require('BuildingStateMachine');
 const CreepStateMachine = require('CreepStateMachine');
 const JobStateMachine = require('JobStateMachine');
@@ -8,7 +7,6 @@ class RoomController {
         this.room = room;
         
         // Initialize all state machines
-        this.energyState = new EnergyStateMachine(room);
         this.buildingState = new BuildingStateMachine(room);
         this.creepState = new CreepStateMachine(room);
         this.jobState = new JobStateMachine(room);
@@ -16,9 +14,6 @@ class RoomController {
 
     run() {
         // Execute state machines in logical order:
-        
-        // 1. First, analyze and manage energy infrastructure
-        this.energyState.run();
         
         // 2. Then ensure we have the creeps we need
         this.creepState.run();
