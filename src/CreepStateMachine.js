@@ -1,4 +1,3 @@
-// CreepStateMachine.js
 const StateMachine = require('StateMachine');
 
 class CreepStateMachine extends StateMachine {
@@ -6,172 +5,167 @@ class CreepStateMachine extends StateMachine {
         super('Creep_' + room.name);
         this.room = room;
         
-        // Define our possible states
-        this.states = {
-            ANALYZE: 'ANALYZE',           // Evaluate creep needs
-            SPAWN_HARVESTER: 'SPAWN_HARVESTER',
-            SPAWN_BUILDER: 'SPAWN_BUILDER',
-            SPAWN_UPGRADER: 'SPAWN_UPGRADER',
-            IDLE: 'IDLE'
-        };
-
         // Initialize population targets in memory
         this.memory[this.name].populationTargets = this.memory[this.name].populationTargets || {
             harvester: 0,
             builder: 0,
             upgrader: 0
         };
-
-        this.setState(this.states.ANALYZE);
     }
 
     run() {
-        // Get current room state
+        // Get current room state including population counts
         const roomState = this.analyzeRoomState();
-
-        // Update population targets based on room state
+        
+        // Update population targets based on current conditions
         this.updatePopulationTargets(roomState);
-
-        // Execute current state
-        switch(this.getState()) {
-            case this.states.ANALYZE:
-                this.runAnalyzeState(roomState);
-                break;
-            case this.states.SPAWN_HARVESTER:
-                this.runSpawnHarvesterState(roomState);
-                break;
-            case this.states.SPAWN_BUILDER:
-                this.runSpawnBuilderState(roomState);
-                break;
-            case this.states.SPAWN_UPGRADER:
-                this.runSpawnUpgraderState(roomState);
-                break;
-            case this.states.IDLE:
-                this.runIdleState();
-                break;
-        }
+        
+        // Process spawning needs in a single tick
+        this.processSpawning(roomState);
     }
 
     analyzeRoomState() {
-        // Gather all relevant room information for decision making
+        // Create a comprehensive snapshot of the room's current state
         return {
             energyAvailable: this.room.energyAvailable,
             energyCapacity: this.room.energyCapacityAvailable,
             sources: this.room.find(FIND_SOURCES).length,
             constructionSites: this.room.find(FIND_CONSTRUCTION_SITES).length,
-            currentPopulation: {
-                harvester: _.filter(Game.creeps, creep => 
-                    creep.memory.role === 'harvester' && creep.room.name === this.room.name).length,
-                builder: _.filter(Game.creeps, creep => 
-                    creep.memory.role === 'builder' && creep.room.name === this.room.name).length,
-                upgrader: _.filter(Game.creeps, creep => 
-                    creep.memory.role === 'upgrader' && creep.room.name === this.room.name).length
-            },
-            roomLevel: this.room.controller.level
+            currentPopulation: this.getCurrentPopulation(),
+            roomLevel: this.room.controller.level,
+            availableSpawns: this.room.find(FIND_MY_SPAWNS, {
+                filter: spawn => !spawn.spawning
+            })
         };
+    }
+
+    getCurrentPopulation() {
+        // Use a single iteration through Game.creeps to get all population counts
+        const population = {
+            harvester: 0,
+            builder: 0,
+            upgrader: 0
+        };
+
+        for (let name in Game.creeps) {
+            const creep = Game.creeps[name];
+            if (creep.room.name === this.room.name && creep.memory.role in population) {
+                population[creep.memory.role]++;
+            }
+        }
+
+        return population;
     }
 
     updatePopulationTargets(roomState) {
-        // Calculate desired population based on room state
         const targets = this.memory[this.name].populationTargets;
         
-        // Harvesters: 2 per source initially
-        targets.harvester = roomState.sources * 2;
+        // Calculate optimal populations based on room conditions
+        targets.harvester = this.calculateHarvesterTarget(roomState);
+        targets.builder = this.calculateBuilderTarget(roomState);
+        targets.upgrader = this.calculateUpgraderTarget(roomState);
         
-        // Builders: Based on construction sites and room level
-        targets.builder = Math.min(
-            Math.ceil(roomState.constructionSites / 5),  // One builder per 5 sites
-            Math.floor(roomState.roomLevel * 1.5)        // But cap based on room level
-        ) || 1;  // Minimum 1 builder
-        
-        // Upgraders: Scale with room level
-        targets.upgrader = Math.max(1, Math.floor(roomState.roomLevel * 0.7));
-        
-        // Save updated targets
         this.memory[this.name].populationTargets = targets;
     }
 
-    getCreepBody(role, energy) {
-        // Define body part combinations for different energy levels
-        const bodies = {
-            harvester: {
-                200: [WORK, CARRY, MOVE],
-                300: [WORK, WORK, CARRY, MOVE],
-                400: [WORK, WORK, CARRY, CARRY, MOVE],
-                500: [WORK, WORK, CARRY, CARRY, MOVE, MOVE]
+    calculateHarvesterTarget(roomState) {
+        // Base number: 2 harvesters per source
+        let target = roomState.sources * 2;
+        
+        // Adjust based on room level and energy capacity
+        if (roomState.roomLevel >= 3) {
+            target += Math.floor(roomState.roomLevel * 0.5);
+        }
+        
+        return target;
+    }
+
+    calculateBuilderTarget(roomState) {
+        // Base calculation accounting for construction needs
+        let target = Math.min(
+            Math.ceil(roomState.constructionSites / 5),
+            Math.floor(roomState.roomLevel * 1.5)
+        );
+        
+        // Ensure at least one builder if there are any construction sites
+        return Math.max(roomState.constructionSites > 0 ? 1 : 0, target);
+    }
+
+    calculateUpgraderTarget(roomState) {
+        // Scale upgraders with room level and energy capacity
+        const baseUpgraders = Math.max(1, Math.floor(roomState.roomLevel * 0.7));
+        const energyRatio = roomState.energyCapacity / 300; // Scale based on energy capacity
+        
+        return Math.floor(baseUpgraders * Math.min(energyRatio, 2));
+    }
+
+    processSpawning(roomState) {
+        // Don't try to spawn if no spawns are available
+        if (roomState.availableSpawns.length === 0) {
+            return;
+        }
+
+        const targets = this.memory[this.name].populationTargets;
+        const current = roomState.currentPopulation;
+        
+        // Define spawn priorities and check them in order
+        const spawnPriorities = [
+            {
+                role: 'harvester',
+                needed: targets.harvester > current.harvester,
+                priority: 1
             },
-            builder: {
-                200: [WORK, CARRY, MOVE],
-                300: [WORK, CARRY, CARRY, MOVE, MOVE],
-                400: [WORK, WORK, CARRY, CARRY, MOVE, MOVE]
+            {
+                role: 'builder',
+                needed: targets.builder > current.builder,
+                priority: 2
             },
-            upgrader: {
-                200: [WORK, CARRY, MOVE],
-                300: [WORK, CARRY, CARRY, MOVE, MOVE],
-                400: [WORK, WORK, CARRY, CARRY, MOVE, MOVE]
+            {
+                role: 'upgrader',
+                needed: targets.upgrader > current.upgrader,
+                priority: 3
             }
+        ];
+
+        // Sort by priority and find the first needed role
+        const toSpawn = spawnPriorities
+            .filter(p => p.needed)
+            .sort((a, b) => a.priority - b.priority)[0];
+
+        if (toSpawn) {
+            this.spawnCreep(toSpawn.role, roomState.energyAvailable, roomState.availableSpawns[0]);
+        }
+    }
+
+    getCreepBody(role, energy) {
+        // Progressive body definitions based on available energy
+        const bodies = {
+            harvester: [
+                { cost: 200, body: [WORK, CARRY, MOVE] },
+                { cost: 300, body: [WORK, WORK, CARRY, MOVE] },
+                { cost: 400, body: [WORK, WORK, CARRY, CARRY, MOVE] },
+                { cost: 500, body: [WORK, WORK, CARRY, CARRY, MOVE, MOVE] }
+            ],
+            builder: [
+                { cost: 200, body: [WORK, CARRY, MOVE] },
+                { cost: 300, body: [WORK, CARRY, CARRY, MOVE, MOVE] },
+                { cost: 400, body: [WORK, WORK, CARRY, CARRY, MOVE, MOVE] }
+            ],
+            upgrader: [
+                { cost: 200, body: [WORK, CARRY, MOVE] },
+                { cost: 300, body: [WORK, CARRY, CARRY, MOVE, MOVE] },
+                { cost: 400, body: [WORK, WORK, CARRY, CARRY, MOVE, MOVE] }
+            ]
         };
 
-        // Find the best body we can afford
-        const availableBodies = bodies[role];
-        const affordableConfigs = Object.entries(availableBodies)
-            .filter(([cost]) => Number(cost) <= energy)
-            .sort(([a], [b]) => Number(b) - Number(a));
-
-        return affordableConfigs.length ? affordableConfigs[0][1] : bodies[role][200];
+        // Find the most expensive body we can afford
+        return bodies[role]
+            .filter(config => config.cost <= energy)
+            .reduce((best, current) => 
+                current.cost > best.cost ? current : best, bodies[role][0]).body;
     }
 
-    runAnalyzeState(roomState) {
-        const targets = this.memory[this.name].populationTargets;
-        
-        // Check population needs in priority order
-        if (roomState.currentPopulation.harvester < targets.harvester) {
-            this.setState(this.states.SPAWN_HARVESTER);
-            return;
-        }
-        
-        if (roomState.currentPopulation.builder < targets.builder) {
-            this.setState(this.states.SPAWN_BUILDER);
-            return;
-        }
-        
-        if (roomState.currentPopulation.upgrader < targets.upgrader) {
-            this.setState(this.states.SPAWN_UPGRADER);
-            return;
-        }
-
-        this.setState(this.states.IDLE);
-    }
-
-    runSpawnHarvesterState(roomState) {
-        this.spawnCreep('harvester', roomState.energyAvailable);
-        this.setState(this.states.ANALYZE);
-    }
-
-    runSpawnBuilderState(roomState) {
-        this.spawnCreep('builder', roomState.energyAvailable);
-        this.setState(this.states.ANALYZE);
-    }
-
-    runSpawnUpgraderState(roomState) {
-        this.spawnCreep('upgrader', roomState.energyAvailable);
-        this.setState(this.states.ANALYZE);
-    }
-
-    runIdleState() {
-        if (this.getStateTime() > 10) {
-            this.setState(this.states.ANALYZE);
-        }
-    }
-
-    spawnCreep(role, energyAvailable) {
-        const spawns = this.room.find(FIND_MY_SPAWNS, {
-            filter: spawn => !spawn.spawning
-        });
-
-        if (spawns.length === 0) return;
-
-        const spawn = spawns[0];
+    spawnCreep(role, energyAvailable, spawn) {
         const body = this.getCreepBody(role, energyAvailable);
         const name = role + Game.time;
 

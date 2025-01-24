@@ -1,4 +1,3 @@
-// JobStateMachine.js
 const StateMachine = require('StateMachine');
 
 class JobStateMachine extends StateMachine {
@@ -6,13 +5,7 @@ class JobStateMachine extends StateMachine {
         super('Job_' + room.name);
         this.room = room;
         
-        // These are the main states for job coordination
-        this.states = {
-            ANALYZE: 'ANALYZE',    // Evaluate room needs and creep jobs
-            EXECUTE: 'EXECUTE'     // Run creep behaviors
-        };
-
-        // Individual creep working states
+        // Since we're combining analysis and execution, we only need workStates now
         this.workStates = {
             HARVEST: 'HARVEST',    // Gathering energy from source
             STORE: 'STORE',        // Delivering energy to structures
@@ -20,22 +13,12 @@ class JobStateMachine extends StateMachine {
             COLLECT: 'COLLECT',    // Getting energy for work
             UPGRADE: 'UPGRADE'     // Upgrading room controller
         };
-
-        this.setState(this.states.ANALYZE);
     }
 
     run() {
-        // Clear memory of dead creeps
+        // Combined analysis and execution in a single tick
         this.clearDeadCreepMemory();
-
-        switch(this.getState()) {
-            case this.states.ANALYZE:
-                this.runAnalyzeState();
-                break;
-            case this.states.EXECUTE:
-                this.runExecuteState();
-                break;
-        }
+        this.processAllCreeps();
     }
 
     clearDeadCreepMemory() {
@@ -46,18 +29,20 @@ class JobStateMachine extends StateMachine {
         }
     }
 
-    runAnalyzeState() {
-        // Initialize any new creeps that don't have a workState
+    processAllCreeps() {
         for(let name in Game.creeps) {
             const creep = Game.creeps[name];
             if(creep.room.name !== this.room.name) continue;
             
+            // Initialize new creeps if needed (analysis phase)
             if(!creep.memory.workState) {
                 this.initializeCreepState(creep);
             }
+            
+            // Update and execute creep behavior (execution phase)
+            this.updateCreepState(creep);
+            this.executeCreepState(creep);
         }
-        
-        this.setState(this.states.EXECUTE);
     }
 
     initializeCreepState(creep) {
@@ -70,22 +55,6 @@ class JobStateMachine extends StateMachine {
         
         // Initialize working flag
         creep.memory.working = true;
-    }
-
-    runExecuteState() {
-        // Execute jobs for all creeps in the room
-        for(let name in Game.creeps) {
-            const creep = Game.creeps[name];
-            if(creep.room.name !== this.room.name) continue;
-            
-            // Check and update creep state based on energy capacity
-            this.updateCreepState(creep);
-            
-            // Execute the appropriate behavior for current state
-            this.executeCreepState(creep);
-        }
-        
-        this.setState(this.states.ANALYZE);
     }
 
     updateCreepState(creep) {
@@ -101,7 +70,6 @@ class JobStateMachine extends StateMachine {
     }
 
     switchToStoringState(creep) {
-        // Switch to appropriate storage/work state based on role
         switch(creep.memory.role) {
             case 'harvester':
                 creep.memory.workState = this.workStates.STORE;
@@ -116,7 +84,6 @@ class JobStateMachine extends StateMachine {
     }
 
     switchToCollectingState(creep) {
-        // Switch to appropriate collection state based on role
         if(creep.memory.role === 'harvester') {
             creep.memory.workState = this.workStates.HARVEST;
         } else {
@@ -125,7 +92,7 @@ class JobStateMachine extends StateMachine {
     }
 
     executeCreepState(creep) {
-        // Execute the appropriate behavior for the creep's current state
+        // Execute behavior based on the creep's current work state
         switch(creep.memory.workState) {
             case this.workStates.HARVEST:
                 this.executeHarvest(creep);
@@ -146,6 +113,7 @@ class JobStateMachine extends StateMachine {
     }
 
     executeHarvest(creep) {
+        // Find and harvest from the closest active energy source
         const source = creep.pos.findClosestByPath(FIND_SOURCES_ACTIVE);
         if(source) {
             if(creep.harvest(source) === ERR_NOT_IN_RANGE) {
@@ -157,10 +125,9 @@ class JobStateMachine extends StateMachine {
     }
 
     executeStore(creep) {
-        // First, try to find critical structures that need energy
+        // First priority: Critical structures that need energy to keep the colony running
         const criticalTarget = creep.pos.findClosestByPath(FIND_STRUCTURES, {
             filter: (structure) => {
-                // Check if it's a spawn, extension, or tower that needs energy
                 return (structure.structureType === STRUCTURE_EXTENSION ||
                         structure.structureType === STRUCTURE_SPAWN ||
                         structure.structureType === STRUCTURE_TOWER) &&
@@ -168,17 +135,66 @@ class JobStateMachine extends StateMachine {
             }
         });
     
-        // If we found a critical structure, prioritize filling it
         if(criticalTarget) {
             if(creep.transfer(criticalTarget, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
                 creep.moveTo(criticalTarget, {
                     visualizePathStyle: {stroke: '#ffffff'}
                 });
             }
-            return; // Exit the method since we're handling critical structures
+            return;
+        }
+
+        // Second priority: Store in nearby containers/storage
+        const nearbyStorage = creep.pos.findInRange(FIND_STRUCTURES, 3, {
+            filter: (structure) => {
+                return (structure.structureType === STRUCTURE_CONTAINER ||
+                        structure.structureType === STRUCTURE_STORAGE) &&
+                        structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0;
+            }
+        });
+
+        if(nearbyStorage.length > 0) {
+            // Find the storage structure with the most free capacity
+            const bestStorage = nearbyStorage.reduce((best, current) => 
+                current.store.getFreeCapacity(RESOURCE_ENERGY) > best.store.getFreeCapacity(RESOURCE_ENERGY) 
+                    ? current 
+                    : best
+            );
+            
+            if(creep.transfer(bestStorage, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                creep.moveTo(bestStorage, {
+                    visualizePathStyle: {stroke: '#ffaa00'}
+                });
+            }
+            return;
+        }
+
+        // Third priority: Help with construction if there are active sites
+        const constructionSite = creep.pos.findClosestByPath(FIND_CONSTRUCTION_SITES);
+        if(constructionSite) {
+            if(creep.build(constructionSite) === ERR_NOT_IN_RANGE) {
+                creep.moveTo(constructionSite, {
+                    visualizePathStyle: {stroke: '#ffffff'}
+                });
+            }
+            return;
+        }
+
+        // Fourth priority: Check if spawns need additional energy beyond critical levels
+        const spawn = creep.pos.findClosestByPath(FIND_MY_SPAWNS, {
+            filter: (spawn) => spawn.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+        });
+
+        if(spawn) {
+            if(creep.transfer(spawn, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                creep.moveTo(spawn, {
+                    visualizePathStyle: {stroke: '#ffffff'}
+                });
+            }
+            return;
         }
     
-        // If no critical structures need energy, use the controller as a fallback
+        // Final priority: If nothing else needs energy, upgrade the controller
         if(creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
             creep.moveTo(creep.room.controller, {
                 visualizePathStyle: {stroke: '#ffffff'}
@@ -187,22 +203,17 @@ class JobStateMachine extends StateMachine {
     }
 
     executeCollect(creep) {
-        // First, check if spawns have excess energy we can use
+        // First try to collect excess energy from spawns (above 70% capacity)
         const spawn = creep.pos.findClosestByPath(FIND_MY_SPAWNS, {
             filter: (spawn) => {
-                // Calculate what 70% of the spawn's capacity would be
                 const safetyThreshold = spawn.store.getCapacity(RESOURCE_ENERGY) * 0.7;
-                // Only withdraw if spawn has more than 70% energy
                 return spawn.store.getUsedCapacity(RESOURCE_ENERGY) > safetyThreshold;
             }
         });
     
-        // If we found a spawn with excess energy, withdraw from it
         if (spawn) {
             const withdrawAmount = Math.min(
-                // Don't take more than we can carry
                 creep.store.getFreeCapacity(RESOURCE_ENERGY),
-                // Don't take more than what's above the 70% threshold
                 spawn.store.getUsedCapacity(RESOURCE_ENERGY) - 
                 (spawn.store.getCapacity(RESOURCE_ENERGY) * 0.7)
             );
@@ -213,11 +224,11 @@ class JobStateMachine extends StateMachine {
                         visualizePathStyle: {stroke: '#ffaa00'}
                     });
                 }
-                return; // Exit if we're handling spawn collection
+                return;
             }
         }
     
-        // If no spawn has excess energy, fall back to harvesting from sources
+        // If no excess energy in spawns, harvest from sources
         const source = creep.pos.findClosestByPath(FIND_SOURCES_ACTIVE);
         if (source) {
             if (creep.harvest(source) === ERR_NOT_IN_RANGE) {
@@ -229,22 +240,73 @@ class JobStateMachine extends StateMachine {
     }
 
     executeBuild(creep) {
-        // Find construction sites
-        const constructionSite = creep.pos.findClosestByPath(FIND_CONSTRUCTION_SITES);
-        if(constructionSite) {
-            if(creep.build(constructionSite) === ERR_NOT_IN_RANGE) {
-                creep.moveTo(constructionSite, {
-                    visualizePathStyle: {stroke: '#ffffff'}
+        // First, let's get all construction sites in the room
+        const constructionSites = creep.room.find(FIND_CONSTRUCTION_SITES);
+        
+        if(constructionSites.length > 0) {
+            // Calculate a priority score for each construction site
+            const prioritizedSites = constructionSites.map(site => {
+                // Calculate progress percentage
+                const progressPercent = site.progress / site.progressTotal;
+                
+                // Define base importance weights for different structure types
+                const importanceWeights = {
+                    // Energy infrastructure (critical)
+                    [STRUCTURE_SPAWN]: 100,
+                    [STRUCTURE_EXTENSION]: 90,
+                    [STRUCTURE_STORAGE]: 85,
+                    
+                    // Defense infrastructure (high priority)
+                    [STRUCTURE_TOWER]: 80,
+                    [STRUCTURE_WALL]: 75,
+                    [STRUCTURE_RAMPART]: 70,
+                    
+                    // Resource infrastructure (medium priority)
+                    [STRUCTURE_CONTAINER]: 60,
+                    [STRUCTURE_LINK]: 55,
+                    
+                    // Movement infrastructure (lower priority)
+                    [STRUCTURE_ROAD]: 40,
+                    
+                    // Default weight for any unspecified structures
+                    default: 30
+                };
+                
+                const importanceWeight = importanceWeights[site.structureType] || importanceWeights.default;
+                
+                const score = (progressPercent * 0.6 * 100) + (importanceWeight * 0.4);
+                
+                return {
+                    site: site,
+                    score: score,
+                    distance: creep.pos.getRangeTo(site)
+                };
+            });
+            
+            const bestSite = prioritizedSites.reduce((best, current) => {
+                const bestAdjustedScore = best.score - (best.distance * 0.5);
+                const currentAdjustedScore = current.score - (current.distance * 0.5);
+                
+                return currentAdjustedScore > bestAdjustedScore ? current : best;
+            });
+            
+            const buildResult = creep.build(bestSite.site);
+            if(buildResult === ERR_NOT_IN_RANGE) {
+                const colorIntensity = Math.min(255, Math.floor(bestSite.score * 2.55));
+                const pathColor = `#${colorIntensity.toString(16).padStart(2, '0')}${colorIntensity.toString(16).padStart(2, '0')}ff`;
+                
+                creep.moveTo(bestSite.site, {
+                    visualizePathStyle: {stroke: pathColor}
                 });
             }
         } else {
-            // If no construction sites, help upgrade controller
+            // If no construction sites exist, help upgrade the controller
             this.executeUpgrade(creep);
         }
     }
 
     executeUpgrade(creep) {
-        // Upgrade the controller
+        // Upgrade the room controller
         if(creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
             creep.moveTo(creep.room.controller, {
                 visualizePathStyle: {stroke: '#ffffff'}
