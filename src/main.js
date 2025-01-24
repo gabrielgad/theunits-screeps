@@ -4,14 +4,17 @@ const roleUpgrader = require('role.upgrader');
 const roleBuilder = require('role.builder');
 const roleHauler = require('role.hauler');
 const roleRepairer = require('role.repairer');
-const spawnManager = require('spawn.manager');
-const memoryManager = require('memory.manager');
+const roleDefender = require('role.defender');
+
 const structurePlanner = require('structure.planner');
 const roadPlanner = require('road.planner');
+
 const constructionManager = require('construction.manager');
 const defenseManager = require('defense.manager');
-const roleDefender = require('role.defender');
 const sourceManager = require('source.manager');
+const roleManager = require('role.manager');
+const spawnManager = require('spawn.manager');
+const memoryManager = require('memory.manager');
 
 // Role handler mapping
 const roleHandlers = {
@@ -23,6 +26,7 @@ const roleHandlers = {
     defender: roleDefender
 };
 
+// Modified main loop
 module.exports.loop = function() {
     // Track CPU usage
     const startCpu = Game.cpu.getUsed();
@@ -35,11 +39,11 @@ module.exports.loop = function() {
         const room = Game.rooms[roomName];
         if(room.controller && room.controller.my) {
             try {
-
                 // Add source manager
                 sourceManager.run(room);
                 
-                // Run construction manager every tick for build queue processing
+                // Run construction manager with stuck site handling
+                this.handleStuckConstructionSites(room);
                 constructionManager.run(room);
                 
                 // Add defense manager
@@ -87,19 +91,16 @@ module.exports.loop = function() {
     const creepCpu = {};
     for(let name in Game.creeps) {
         const creep = Game.creeps[name];
-        const roleHandler = roleHandlers[creep.memory.role];
-        
-        if(roleHandler) {
-            try {
-                const startCreepCpu = Game.cpu.getUsed();
-                roleHandler.run(creep);
-                const creepCpuUsed = Game.cpu.getUsed() - startCreepCpu;
-                
-                // Track CPU usage by role
-                creepCpu[creep.memory.role] = (creepCpu[creep.memory.role] || 0) + creepCpuUsed;
-            } catch(error) {
-                console.log(`Error running ${creep.memory.role} ${creep.name}: ${error}`);
-            }
+        try {
+            const startCreepCpu = Game.cpu.getUsed();
+            // Use the new role manager instead of role handlers
+            roleManager.run(creep);
+            const creepCpuUsed = Game.cpu.getUsed() - startCreepCpu;
+            
+            // Track CPU usage by role
+            creepCpu[creep.memory.role] = (creepCpu[creep.memory.role] || 0) + creepCpuUsed;
+        } catch(error) {
+            console.log(`Error running creep ${creep.name}: ${error}`);
         }
     }
     
@@ -166,6 +167,55 @@ module.exports.handleLowEnergy = function(room) {
     idleCreeps.forEach(creep => {
         creep.memory.emergencyHarvesting = true;
     });
+};
+
+module.exports.handleStuckConstructionSites = function(room) {
+    const STUCK_THRESHOLD = 100; // Number of ticks before considering a site stuck
+    const MAX_CONCURRENT_SITES = 3; // Maximum number of active construction sites
+
+    if(!room.memory.metrics || !room.memory.metrics.constructionProgress) return;
+    
+    // Get all construction sites
+    const sites = room.find(FIND_CONSTRUCTION_SITES);
+    const metrics = room.memory.metrics.constructionProgress;
+    
+    // Handle stuck sites
+    let activeConstructionCount = 0;
+    sites.forEach(site => {
+        const siteMetrics = metrics[site.id];
+        if(!siteMetrics) return;
+
+        // Mark sites as active/inactive based on progress
+        if(siteMetrics.stuckTime > STUCK_THRESHOLD) {
+            // If the site is stuck, remove it if we have too many active sites
+            if(activeConstructionCount >= MAX_CONCURRENT_SITES) {
+                site.remove();
+                delete metrics[site.id];
+                console.log(`Removed stuck construction site ${site.id} (${site.structureType})`);
+            } else {
+                // Otherwise, reset the stuck timer and keep it as one of our active sites
+                siteMetrics.stuckTime = 0;
+                activeConstructionCount++;
+            }
+        } else {
+            activeConstructionCount++;
+        }
+    });
+    
+    // If we have too many total sites, remove the ones with least progress
+    if(sites.length > MAX_CONCURRENT_SITES) {
+        const sitesByProgress = sites.sort((a, b) => 
+            (a.progress / a.progressTotal) - (b.progress / b.progressTotal)
+        );
+        
+        // Remove excess sites, keeping only MAX_CONCURRENT_SITES
+        while(sitesByProgress.length > MAX_CONCURRENT_SITES) {
+            const siteToRemove = sitesByProgress.shift();
+            siteToRemove.remove();
+            delete metrics[siteToRemove.id];
+            console.log(`Removed excess construction site ${siteToRemove.id} (${siteToRemove.structureType})`);
+        }
+    }
 };
 
 module.exports.logDetailedStats = function(creepCpu, startCpu) {

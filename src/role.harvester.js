@@ -1,4 +1,4 @@
-// src/role.harvester.js
+// role.harvester.js
 const sourceManager = require('source.manager');
 
 module.exports = {
@@ -14,44 +14,44 @@ module.exports = {
             }
         }
 
-        if(creep.store.getFreeCapacity() > 0) {
-            if(creep.memory.targetSource) {
-                const source = Game.getObjectById(creep.memory.targetSource);
-                if(source) {
-                    const optimalPos = sourceManager.getOptimalMiningPosition(source, creep);
-                    if(optimalPos) {
-                        if(creep.pos.x !== optimalPos.x || creep.pos.y !== optimalPos.y) {
-                            creep.moveTo(optimalPos.x, optimalPos.y, {visualizePathStyle: {stroke: '#ffaa00'}});
-                        } else {
+        if(creep.memory.targetSource) {
+            const source = Game.getObjectById(creep.memory.targetSource);
+            if(source) {
+                const optimalPos = sourceManager.getOptimalMiningPosition(source, creep);
+                if(optimalPos) {
+                    // Move to optimal position
+                    if(creep.pos.x !== optimalPos.x || creep.pos.y !== optimalPos.y) {
+                        creep.moveTo(optimalPos.x, optimalPos.y, {visualizePathStyle: {stroke: '#ffaa00'}});
+                        return;
+                    }
+
+                    // We're at the optimal position
+                    // First, help build container if there's a construction site
+                    const constructionSite = creep.pos.findInRange(FIND_CONSTRUCTION_SITES, 0, {
+                        filter: site => site.structureType === STRUCTURE_CONTAINER
+                    })[0];
+
+                    if(constructionSite) {
+                        if(creep.store.getFreeCapacity() > 0) {
                             creep.harvest(source);
+                        } else {
+                            creep.build(constructionSite);
                         }
+                        return;
                     }
-                }
-            }
-        } else {
-            // Find nearby container
-            const container = creep.pos.findClosestByRange(FIND_STRUCTURES, {
-                filter: s => s.structureType === STRUCTURE_CONTAINER &&
-                           s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
-            });
 
-            if(container) {
-                if(creep.transfer(container, RESOURCE_ENERGY) == ERR_NOT_IN_RANGE) {
-                    creep.moveTo(container, {visualizePathStyle: {stroke: '#ffffff'}});
-                }
-            } else {
-                // If no container, find spawn or extensions
-                let target = creep.pos.findClosestByPath(FIND_STRUCTURES, {
-                    filter: (structure) => {
-                        return (structure.structureType == STRUCTURE_EXTENSION ||
-                                structure.structureType == STRUCTURE_SPAWN) &&
-                                structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0;
-                    }
-                });
+                    // Check for container
+                    const container = creep.pos.findInRange(FIND_STRUCTURES, 0, {
+                        filter: s => s.structureType === STRUCTURE_CONTAINER
+                    })[0];
 
-                if(target) {
-                    if(creep.transfer(target, RESOURCE_ENERGY) == ERR_NOT_IN_RANGE) {
-                        creep.moveTo(target, {visualizePathStyle: {stroke: '#ffffff'}});
+                    // Harvest and handle energy
+                    if(creep.store.getFreeCapacity() > 0) {
+                        creep.harvest(source);
+                    } else if(container) {
+                        creep.transfer(container, RESOURCE_ENERGY);
+                    } else {
+                        creep.drop(RESOURCE_ENERGY);
                     }
                 }
             }
