@@ -8,8 +8,14 @@ class PlannerContainer {
         const containers = this.room.find(FIND_STRUCTURES, {
             filter: { structureType: STRUCTURE_CONTAINER }
         });
+        
+        // Check specifically for a container near controller
+        const controllerContainers = containers.filter(c => 
+            c.pos.getRangeTo(this.room.controller) <= 2
+        );
+        
         // Need containers for: sources + controller + extension area
-        return containers.length < sources.length + 2;
+        return containers.length < sources.length + 2 || controllerContainers.length === 0;
     }
 
     planPositions() {
@@ -39,7 +45,6 @@ class PlannerContainer {
                 source.pos.y - 1, source.pos.x - 1,
                 source.pos.y + 1, source.pos.x + 1, true);
             
-            // Find closest non-wall position to source
             let bestPos = null;
             let bestDistance = Infinity;
             for (let spot of area) {
@@ -58,21 +63,31 @@ class PlannerContainer {
 
     addControllerContainer(positions) {
         const controllerArea = this.room.lookForAtArea(LOOK_TERRAIN,
-            this.room.controller.pos.y - 1, this.room.controller.pos.x - 1,
-            this.room.controller.pos.y + 1, this.room.controller.pos.x + 1, true);
+            this.room.controller.pos.y - 2, this.room.controller.pos.x - 2,
+            this.room.controller.pos.y + 2, this.room.controller.pos.x + 2, true);
         
         let bestPos = null;
         let bestDistance = Infinity;
+        
         for (let spot of controllerArea) {
             if (spot.terrain !== 'wall') {
                 const pos = new RoomPosition(spot.x, spot.y, this.room.name);
                 const distance = this.room.controller.pos.getRangeTo(pos);
-                if (distance < bestDistance) {
-                    bestDistance = distance;
-                    bestPos = pos;
+                
+                const structures = this.room.lookForAt(LOOK_STRUCTURES, pos.x, pos.y);
+                const constructionSites = this.room.lookForAt(LOOK_CONSTRUCTION_SITES, pos.x, pos.y);
+                
+                if (distance >= 1 && distance <= 2 && 
+                    structures.length === 0 && 
+                    constructionSites.length === 0) {
+                        if (distance < bestDistance) {
+                            bestDistance = distance;
+                            bestPos = pos;
+                        }
                 }
             }
         }
+        
         if (bestPos) positions.push(bestPos);
     }
 }
