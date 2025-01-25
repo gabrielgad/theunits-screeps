@@ -73,18 +73,21 @@ class CreepStateMachine extends StateMachine {
 
     processSpawning(roomState) {
         if (roomState.availableSpawns.length === 0) return;
-
+    
+        // Wait for full energy
+        if (roomState.energyAvailable < roomState.energyCapacity) return;
+    
         const targets = this.memory[this.name].populationTargets;
         const current = roomState.currentPopulation;
         
         const creepTypes = {
             harvester: { Class: CreepHarvester, priority: 1 },
-            hauler: { Class: CreepHauler, priority: 1 },      // Same priority as harvester since they work together
-            builder: { Class: CreepBuilder, priority: 3 },     // Lowered builder priority since haulers are more important
-            upgrader: { Class: CreepUpgrader, priority: 4 },   // Adjusted upgrader priority down
-            repairer: { Class: CreepRepairer, priority: 3 }    // Kept repairer at same relative priority as builder
+            hauler: { Class: CreepHauler, priority: 1 },
+            builder: { Class: CreepBuilder, priority: 3 },
+            upgrader: { Class: CreepUpgrader, priority: 4 },
+            repairer: { Class: CreepRepairer, priority: 3 }
         };
-
+    
         const toSpawn = Object.entries(creepTypes)
             .map(([role, config]) => ({
                 role,
@@ -94,9 +97,14 @@ class CreepStateMachine extends StateMachine {
             }))
             .filter(p => p.needed)
             .sort((a, b) => a.priority - b.priority)[0];
-
+    
         if (toSpawn) {
-            this.spawnCreep(toSpawn.role, toSpawn.Class, roomState.energyAvailable, roomState.availableSpawns[0]);
+            this.spawnCreep(
+                toSpawn.role, 
+                toSpawn.Class, 
+                roomState.energyCapacity,
+                roomState.availableSpawns[0]
+            );
         }
     }
 

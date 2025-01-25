@@ -22,10 +22,11 @@ class CreepHauler {
             { cost: 800, body: [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE] } // 400 capacity
         ];
 
-        return bodies
+        const selected = bodies
             .filter(config => config.cost <= energy)
             .reduce((best, current) => 
-                current.cost > best.cost ? current : best, bodies[0]).body;
+                current.cost > best.cost ? current : best, bodies[0]);
+        return selected.body;
     }
 }
 

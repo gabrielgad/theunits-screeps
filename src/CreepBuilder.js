@@ -15,10 +15,11 @@ class CreepBuilder {
             { cost: 400, body: [WORK, WORK, CARRY, CARRY, MOVE, MOVE] }
         ];
 
-        return bodies
+        const selected = bodies
             .filter(config => config.cost <= energy)
             .reduce((best, current) => 
-                current.cost > best.cost ? current : best, bodies[0]).body;
+                current.cost > best.cost ? current : best, bodies[0]);
+        return selected.body;
     }
 }
 
