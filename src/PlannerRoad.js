@@ -2,7 +2,9 @@ class PlannerRoad {
     constructor(room) {
         this.room = room;
         this.trafficMap = new PathFinder.CostMatrix();
-        this.TRAFFIC_WEIGHT_THRESHOLD = 5; // Minimum traffic weight to consider for road placement
+        this.TRAFFIC_WEIGHT_THRESHOLD = 5;
+        this.baseBoundary = null;
+        this.initializeBaseBoundary();
     }
 
     shouldBuildRoads() {
@@ -186,16 +188,160 @@ class PlannerRoad {
         return clusters;
     }
 
+    initializeBaseBoundary() {
+        // Find all walls and ramparts to determine base boundary
+        const defenseStructures = this.room.find(FIND_STRUCTURES, {
+            filter: struct => 
+                struct.structureType === STRUCTURE_RAMPART || 
+                struct.structureType === STRUCTURE_WALL
+        });
+
+        if (defenseStructures.length === 0) return;
+
+        // Create a matrix to mark the enclosed area
+        const boundaryMatrix = new PathFinder.CostMatrix();
+        
+        // Mark all defensive structures
+        for (let struct of defenseStructures) {
+            boundaryMatrix.set(struct.pos.x, struct.pos.y, 1);
+        }
+
+        // Find a spawn or other interior structure to start flood fill
+        const spawn = this.room.find(FIND_MY_SPAWNS)[0];
+        if (!spawn) return;
+
+        // Use flood fill to identify the enclosed area
+        this.baseBoundary = this.floodFillBase(spawn.pos, boundaryMatrix);
+    }
+
+    floodFillBase(startPos, boundaryMatrix) {
+        const interior = new PathFinder.CostMatrix();
+        const queue = [startPos];
+        const seen = new Set([`${startPos.x},${startPos.y}`]);
+
+        while (queue.length > 0) {
+            const pos = queue.shift();
+            interior.set(pos.x, pos.y, 1);
+
+            // Check all adjacent positions
+            for (let dx = -1; dx <= 1; dx++) {
+                for (let dy = -1; dy <= 1; dy++) {
+                    if (dx === 0 && dy === 0) continue;
+
+                    const newX = pos.x + dx;
+                    const newY = pos.y + dy;
+
+                    // Skip if out of bounds
+                    if (newX < 0 || newX > 49 || newY < 0 || newY > 49) continue;
+
+                    const posKey = `${newX},${newY}`;
+                    if (seen.has(posKey)) continue;
+
+                    // If we hit a boundary structure, stop this path
+                    if (boundaryMatrix.get(newX, newY) === 1) continue;
+
+                    // Add the position to the queue if it's not a wall
+                    const terrain = Game.map.getRoomTerrain(this.room.name);
+                    if (terrain.get(newX, newY) !== TERRAIN_MASK_WALL) {
+                        queue.push(new RoomPosition(newX, newY, this.room.name));
+                        seen.add(posKey);
+                    }
+                }
+            }
+        }
+
+        return interior;
+    }
+
+    isInsideBase(pos) {
+        if (!this.baseBoundary) return true; // If no boundary detected, assume everything is inside
+        return this.baseBoundary.get(pos.x, pos.y) === 1;
+    }
+
+    analyzeRepairerPaths(spawn) {
+        const defensiveStructures = this.room.find(FIND_STRUCTURES, {
+            filter: struct => 
+                struct.structureType === STRUCTURE_RAMPART || 
+                struct.structureType === STRUCTURE_WALL
+        });
+
+        const clusters = this.groupDefensiveStructures(defensiveStructures);
+
+        for (let cluster of clusters) {
+            const centerX = Math.floor(cluster.reduce((sum, struct) => sum + struct.pos.x, 0) / cluster.length);
+            const centerY = Math.floor(cluster.reduce((sum, struct) => sum + struct.pos.y, 0) / cluster.length);
+            const centerPos = new RoomPosition(centerX, centerY, this.room.name);
+
+            // Modify the PathFinder options to stay inside the base
+            const repairPath = PathFinder.search(
+                spawn.pos,
+                { pos: centerPos, range: 2 },
+                {
+                    plainCost: 2,
+                    swampCost: 10,
+                    roomCallback: (roomName) => {
+                        const matrix = this.getRoomCallback(roomName);
+                        // Add high cost for positions outside the base
+                        for (let y = 0; y < 50; y++) {
+                            for (let x = 0; x < 50; x++) {
+                                if (!this.isInsideBase(new RoomPosition(x, y, roomName))) {
+                                    matrix.set(x, y, 255);
+                                }
+                            }
+                        }
+                        return matrix;
+                    }
+                }
+            ).path;
+
+            // Only add traffic weight to positions inside the base
+            for (let pos of repairPath) {
+                if (this.isInsideBase(pos)) {
+                    const currentWeight = this.trafficMap.get(pos.x, pos.y);
+                    this.trafficMap.set(pos.x, pos.y, currentWeight + 4);
+                }
+            }
+
+            // Handle intra-cluster paths similarly
+            for (let i = 0; i < cluster.length - 1; i++) {
+                const connectPath = PathFinder.search(
+                    cluster[i].pos,
+                    { pos: cluster[i + 1].pos, range: 1 },
+                    {
+                        plainCost: 2,
+                        swampCost: 10,
+                        roomCallback: (roomName) => {
+                            const matrix = this.getRoomCallback(roomName);
+                            for (let y = 0; y < 50; y++) {
+                                for (let x = 0; x < 50; x++) {
+                                    if (!this.isInsideBase(new RoomPosition(x, y, roomName))) {
+                                        matrix.set(x, y, 255);
+                                    }
+                                }
+                            }
+                            return matrix;
+                        }
+                    }
+                ).path;
+
+                for (let pos of connectPath) {
+                    if (this.isInsideBase(pos)) {
+                        const currentWeight = this.trafficMap.get(pos.x, pos.y);
+                        this.trafficMap.set(pos.x, pos.y, currentWeight + 2);
+                    }
+                }
+            }
+        }
+    }
+
     planHighTrafficPaths(positions) {
-        // Add roads on positions with high traffic
         for (let y = 0; y < 50; y++) {
             for (let x = 0; x < 50; x++) {
-                if (this.trafficMap.get(x, y) >= this.TRAFFIC_WEIGHT_THRESHOLD) {
-                    // Check if position is buildable
-                    const pos = new RoomPosition(x, y, this.room.name);
-                    if (this.isPositionBuildable(pos)) {
-                        positions.add(`${x},${y}`);
-                    }
+                const pos = new RoomPosition(x, y, this.room.name);
+                if (this.trafficMap.get(x, y) >= this.TRAFFIC_WEIGHT_THRESHOLD && 
+                    this.isInsideBase(pos) && 
+                    this.isPositionBuildable(pos)) {
+                    positions.add(`${x},${y}`);
                 }
             }
         }
