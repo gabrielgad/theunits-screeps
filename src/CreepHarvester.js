@@ -1,20 +1,16 @@
 class CreepHarvester {
     static calculateTarget(roomState) {
-        let target = roomState.sources * 2;
-        
-        if (roomState.roomLevel >= 3) {
-            target += Math.floor(roomState.roomLevel * 0.5);
-        }
-        
-        return target;
+        return roomState.spawns * 2;
     }
 
     static getBody(energy) {
         const bodies = [
-            { cost: 200, body: [WORK, CARRY, MOVE] },
-            { cost: 300, body: [WORK, WORK, CARRY, MOVE] },
-            { cost: 400, body: [WORK, WORK, CARRY, CARRY, MOVE] },
-            { cost: 500, body: [WORK, WORK, CARRY, CARRY, MOVE, MOVE] }
+            { cost: 200, body: [WORK, CARRY, MOVE] },              // Early game balanced
+            { cost: 300, body: [WORK, WORK, CARRY, MOVE] },        // Early game source-sitter
+            { cost: 400, body: [WORK, WORK, WORK, CARRY, MOVE] },  // Better harvesting
+            { cost: 550, body: [WORK, WORK, WORK, WORK, CARRY, MOVE] }, // Strong harvesting
+            { cost: 700, body: [WORK, WORK, WORK, WORK, WORK, CARRY, MOVE] }, // Max harvesting
+            { cost: 800, body: [WORK, WORK, WORK, WORK, WORK, CARRY, CARRY, MOVE] }  // Max harvesting + extra carry
         ];
 
         return bodies
