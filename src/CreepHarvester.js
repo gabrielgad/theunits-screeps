@@ -1,6 +1,9 @@
 class CreepHarvester {
     static calculateTarget(roomState) {
-        return roomState.spawns * 2;
+        // Use number of sources instead of spawns for harvester calculation
+        // Typically want 1-2 harvesters per source depending on room level
+        const harvestersPerSource = roomState.roomLevel <= 2 ? 1 : 2;
+        return roomState.sources * harvestersPerSource;
     }
 
     static getBody(energy) {
