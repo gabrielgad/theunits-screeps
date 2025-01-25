@@ -1,8 +1,8 @@
 const StateMachine = require('StateMachine');
-const HarvesterCreep = require('HarvesterCreep');
-const BuilderCreep = require('BuilderCreep');
-const UpgraderCreep = require('UpgraderCreep');
-const RepairerCreep = require('RepairerCreep');
+const CreepHarvester = require('CreepHarvester');
+const CreepBuilder = require('CreepBuilder');
+const CreepUpgrader = require('CreepUpgrader');
+const CreepRepairer = require('CreepRepairer');
 
 class CreepStateMachine extends StateMachine {
     constructor(room) {
@@ -59,10 +59,10 @@ class CreepStateMachine extends StateMachine {
     updatePopulationTargets(roomState) {
         const targets = this.memory[this.name].populationTargets;
         
-        targets.harvester = HarvesterCreep.calculateTarget(roomState);
-        targets.builder = BuilderCreep.calculateTarget(roomState);
-        targets.upgrader = UpgraderCreep.calculateTarget(roomState);
-        targets.repairer = RepairerCreep.calculateTarget(roomState);
+        targets.harvester = CreepHarvester.calculateTarget(roomState);
+        targets.builder = CreepBuilder.calculateTarget(roomState);
+        targets.upgrader = CreepUpgrader.calculateTarget(roomState);
+        targets.repairer = CreepRepairer.calculateTarget(roomState);
 
         this.memory[this.name].populationTargets = targets;
     }
@@ -74,10 +74,10 @@ class CreepStateMachine extends StateMachine {
         const current = roomState.currentPopulation;
         
         const creepTypes = {
-            harvester: { Class: HarvesterCreep, priority: 1 },
-            builder: { Class: BuilderCreep, priority: 2 },
-            upgrader: { Class: UpgraderCreep, priority: 3 },
-            repairer: { Class: RepairerCreep, priority: 2 }
+            harvester: { Class: CreepHarvester, priority: 1 },
+            builder: { Class: CreepBuilder, priority: 2 },
+            upgrader: { Class: CreepUpgrader, priority: 3 },
+            repairer: { Class: CreepRepairer, priority: 2 }
         };
 
         const toSpawn = Object.entries(creepTypes)

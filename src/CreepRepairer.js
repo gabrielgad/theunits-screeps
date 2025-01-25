@@ -1,6 +1,5 @@
-class RepairerCreep {
+class CreepRepairer {
     static calculateTarget(roomState) {
-        // Find total hits missing from structures that can be repaired
         const structures = roomState.room.find(FIND_STRUCTURES, {
             filter: structure => {
                 return structure.hits < structure.hitsMax && 
@@ -9,13 +8,10 @@ class RepairerCreep {
             }
         });
         
-        // Calculate repair need based on total damage and room level
         let damageRatio = structures.reduce((sum, structure) => {
             return sum + (1 - (structure.hits / structure.hitsMax));
         }, 0);
         
-        // Target formula: 1 repairer per 200% total damage ratio, scaled with room level
-        // Minimum 1 repairer if there's any damage, maximum based on room level
         let target = Math.min(
             Math.ceil(damageRatio / 2),
             Math.floor(roomState.roomLevel * 1.2)
@@ -39,4 +35,4 @@ class RepairerCreep {
     }
 }
 
-module.exports = RepairerCreep;
+module.exports = CreepRepairer;

@@ -1,9 +1,11 @@
-class UpgraderCreep {
+class CreepBuilder {
     static calculateTarget(roomState) {
-        const baseUpgraders = Math.max(1, Math.floor(roomState.roomLevel * 0.7));
-        const energyRatio = roomState.energyCapacity / 300;
+        let target = Math.min(
+            Math.ceil(roomState.constructionSites / 5),
+            Math.floor(roomState.roomLevel * 1.5)
+        );
         
-        return Math.floor(baseUpgraders * Math.min(energyRatio, 2));
+        return Math.max(roomState.constructionSites > 0 ? 1 : 0, target);
     }
 
     static getBody(energy) {
@@ -20,4 +22,4 @@ class UpgraderCreep {
     }
 }
 
-module.exports = UpgraderCreep;
+module.exports = CreepBuilder;

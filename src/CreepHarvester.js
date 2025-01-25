@@ -1,4 +1,4 @@
-class HarvesterCreep {
+class CreepHarvester {
     static calculateTarget(roomState) {
         let target = roomState.sources * 2;
         
@@ -24,4 +24,4 @@ class HarvesterCreep {
     }
 }
 
-module.exports = HarvesterCreep;
+module.exports = CreepHarvester;
