@@ -4,7 +4,9 @@ const WorkStates = {
     BUILD: 'BUILD',
     COLLECT: 'COLLECT',
     UPGRADE: 'UPGRADE',
-    REPAIR: 'REPAIR'
+    REPAIR: 'REPAIR',
+    PICKUP: 'PICKUP',     // New state for haulers picking up resources
+    DELIVER: 'DELIVER'    // New state for haulers delivering resources
 };
 
 const CreepStates = {
@@ -18,6 +20,21 @@ const CreepStates = {
             },
             [WorkStates.STORE]: {
                 nextState: WorkStates.HARVEST,
+                condition: (creep) => creep.store[RESOURCE_ENERGY] === 0
+            }
+        }
+    },
+    
+    hauler: {
+        states: [WorkStates.PICKUP, WorkStates.DELIVER],
+        initialState: WorkStates.PICKUP,
+        transitions: {
+            [WorkStates.PICKUP]: {
+                nextState: WorkStates.DELIVER,
+                condition: (creep) => creep.store.getFreeCapacity() === 0
+            },
+            [WorkStates.DELIVER]: {
+                nextState: WorkStates.PICKUP,
                 condition: (creep) => creep.store[RESOURCE_ENERGY] === 0
             }
         }

@@ -4,6 +4,8 @@ const ExecuteBuild = require('ExecuteBuild');
 const ExecuteUpgrade = require('ExecuteUpgrade');
 const ExecuteCollect = require('ExecuteCollect');
 const ExecuteRepair = require('ExecuteRepair');
+const ExecutePickup = require('ExecutePickup');
+const ExecuteDeliver = require('ExecuteDeliver');
 
 const ExecuteActions = {
     executeState(creep, state) {
@@ -20,6 +22,10 @@ const ExecuteActions = {
                 return ExecuteCollect.execute(creep);
             case 'REPAIR':
                 return ExecuteRepair.execute(creep);
+            case 'PICKUP':
+                return ExecutePickup.execute(creep);
+            case 'DELIVER':
+                return ExecuteDeliver.execute(creep);
             default:
                 console.log(`Unknown state ${state} for creep ${creep.name}`);
         }

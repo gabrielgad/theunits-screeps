@@ -3,6 +3,7 @@ const CreepHarvester = require('CreepHarvester');
 const CreepBuilder = require('CreepBuilder');
 const CreepUpgrader = require('CreepUpgrader');
 const CreepRepairer = require('CreepRepairer');
+const CreepHauler = require('CreepHauler');
 
 class CreepStateMachine extends StateMachine {
     constructor(room) {
@@ -11,6 +12,7 @@ class CreepStateMachine extends StateMachine {
         
         this.memory[this.name].populationTargets = this.memory[this.name].populationTargets || {
             harvester: 0,
+            hauler: 0,
             builder: 0,
             upgrader: 0,
             repairer: 0
@@ -41,6 +43,7 @@ class CreepStateMachine extends StateMachine {
     getCurrentPopulation() {
         const population = {
             harvester: 0,
+            hauler: 0,
             builder: 0,
             upgrader: 0,
             repairer: 0
@@ -60,6 +63,7 @@ class CreepStateMachine extends StateMachine {
         const targets = this.memory[this.name].populationTargets;
         
         targets.harvester = CreepHarvester.calculateTarget(roomState);
+        targets.hauler = CreepHauler.calculateTarget(roomState);
         targets.builder = CreepBuilder.calculateTarget(roomState);
         targets.upgrader = CreepUpgrader.calculateTarget(roomState);
         targets.repairer = CreepRepairer.calculateTarget(roomState);
@@ -75,9 +79,10 @@ class CreepStateMachine extends StateMachine {
         
         const creepTypes = {
             harvester: { Class: CreepHarvester, priority: 1 },
-            builder: { Class: CreepBuilder, priority: 2 },
-            upgrader: { Class: CreepUpgrader, priority: 3 },
-            repairer: { Class: CreepRepairer, priority: 2 }
+            hauler: { Class: CreepHauler, priority: 1 },      // Same priority as harvester since they work together
+            builder: { Class: CreepBuilder, priority: 3 },     // Lowered builder priority since haulers are more important
+            upgrader: { Class: CreepUpgrader, priority: 4 },   // Adjusted upgrader priority down
+            repairer: { Class: CreepRepairer, priority: 3 }    // Kept repairer at same relative priority as builder
         };
 
         const toSpawn = Object.entries(creepTypes)
