@@ -10,6 +10,10 @@ class CreepStateMachine extends StateMachine {
         super('Creep_' + room.name);
         this.room = room;
         
+        if (!this.memory[this.name]) {
+            this.memory[this.name] = {};
+        }
+        
         this.memory[this.name].populationTargets = this.memory[this.name].populationTargets || {
             harvester: 0,
             hauler: 0,
@@ -55,7 +59,7 @@ class CreepStateMachine extends StateMachine {
                 population[creep.memory.role]++;
             }
         }
-
+        
         return population;
     }
 
@@ -73,8 +77,6 @@ class CreepStateMachine extends StateMachine {
 
     processSpawning(roomState) {
         if (roomState.availableSpawns.length === 0) return;
-    
-        // Wait for full energy
         if (roomState.energyAvailable < roomState.energyCapacity) return;
     
         const targets = this.memory[this.name].populationTargets;
@@ -99,29 +101,21 @@ class CreepStateMachine extends StateMachine {
             .sort((a, b) => a.priority - b.priority)[0];
     
         if (toSpawn) {
-            this.spawnCreep(
-                toSpawn.role, 
-                toSpawn.Class, 
-                roomState.energyCapacity,
-                roomState.availableSpawns[0]
-            );
-        }
-    }
+            const spawn = roomState.availableSpawns[0];
+            const body = toSpawn.Class.getBody(roomState.energyCapacity);
+            const name = toSpawn.role + Game.time;
+            
+            const result = spawn.spawnCreep(body, name, {
+                memory: {
+                    role: toSpawn.role,
+                    working: false,
+                    room: this.room.name
+                }
+            });
 
-    spawnCreep(role, CreepClass, energyAvailable, spawn) {
-        const body = CreepClass.getBody(energyAvailable);
-        const name = role + Game.time;
-
-        const result = spawn.spawnCreep(body, name, {
-            memory: {
-                role: role,
-                working: false,
-                room: this.room.name
+            if (result === OK) {
+                console.log(`${this.room.name} spawning new ${toSpawn.role}: ${name}`);
             }
-        });
-
-        if (result === OK) {
-            console.log(`${this.room.name} spawning new ${role}: ${name}`);
         }
     }
 }
