@@ -3,6 +3,7 @@ const ExecuteStore = require('ExecuteStore');
 const ExecuteBuild = require('ExecuteBuild');
 const ExecuteUpgrade = require('ExecuteUpgrade');
 const ExecuteCollect = require('ExecuteCollect');
+const ExecuteRepair = require('ExecuteRepair');
 
 const ExecuteActions = {
     executeState(creep, state) {
@@ -17,6 +18,8 @@ const ExecuteActions = {
                 return ExecuteUpgrade.execute(creep);
             case 'COLLECT':
                 return ExecuteCollect.execute(creep);
+            case 'REPAIR':
+                return ExecuteRepair.execute(creep);
             default:
                 console.log(`Unknown state ${state} for creep ${creep.name}`);
         }

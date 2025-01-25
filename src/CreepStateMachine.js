@@ -2,6 +2,7 @@ const StateMachine = require('StateMachine');
 const HarvesterCreep = require('HarvesterCreep');
 const BuilderCreep = require('BuilderCreep');
 const UpgraderCreep = require('UpgraderCreep');
+const RepairerCreep = require('RepairerCreep');
 
 class CreepStateMachine extends StateMachine {
     constructor(room) {
@@ -11,7 +12,8 @@ class CreepStateMachine extends StateMachine {
         this.memory[this.name].populationTargets = this.memory[this.name].populationTargets || {
             harvester: 0,
             builder: 0,
-            upgrader: 0
+            upgrader: 0,
+            repairer: 0
         };
     }
 
@@ -23,6 +25,7 @@ class CreepStateMachine extends StateMachine {
 
     analyzeRoomState() {
         return {
+            room: this.room,
             energyAvailable: this.room.energyAvailable,
             energyCapacity: this.room.energyCapacityAvailable,
             sources: this.room.find(FIND_SOURCES).length,
@@ -39,7 +42,8 @@ class CreepStateMachine extends StateMachine {
         const population = {
             harvester: 0,
             builder: 0,
-            upgrader: 0
+            upgrader: 0,
+            repairer: 0
         };
 
         for (let name in Game.creeps) {
@@ -58,7 +62,8 @@ class CreepStateMachine extends StateMachine {
         targets.harvester = HarvesterCreep.calculateTarget(roomState);
         targets.builder = BuilderCreep.calculateTarget(roomState);
         targets.upgrader = UpgraderCreep.calculateTarget(roomState);
-        
+        targets.repairer = RepairerCreep.calculateTarget(roomState);
+
         this.memory[this.name].populationTargets = targets;
     }
 
@@ -71,7 +76,8 @@ class CreepStateMachine extends StateMachine {
         const creepTypes = {
             harvester: { Class: HarvesterCreep, priority: 1 },
             builder: { Class: BuilderCreep, priority: 2 },
-            upgrader: { Class: UpgraderCreep, priority: 3 }
+            upgrader: { Class: UpgraderCreep, priority: 3 },
+            repairer: { Class: RepairerCreep, priority: 2 }
         };
 
         const toSpawn = Object.entries(creepTypes)

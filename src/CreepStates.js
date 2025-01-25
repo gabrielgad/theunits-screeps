@@ -3,7 +3,8 @@ const WorkStates = {
     STORE: 'STORE',
     BUILD: 'BUILD',
     COLLECT: 'COLLECT',
-    UPGRADE: 'UPGRADE'
+    UPGRADE: 'UPGRADE',
+    REPAIR: 'REPAIR'
 };
 
 const CreepStates = {
@@ -46,6 +47,21 @@ const CreepStates = {
                 condition: (creep) => creep.store.getFreeCapacity() === 0
             },
             [WorkStates.UPGRADE]: {
+                nextState: WorkStates.COLLECT,
+                condition: (creep) => creep.store[RESOURCE_ENERGY] === 0
+            }
+        }
+    },
+
+    repairer: {
+        states: [WorkStates.COLLECT, WorkStates.REPAIR],
+        initialState: WorkStates.COLLECT,
+        transitions: {
+            [WorkStates.COLLECT]: {
+                nextState: WorkStates.REPAIR,
+                condition: (creep) => creep.store.getFreeCapacity() === 0
+            },
+            [WorkStates.REPAIR]: {
                 nextState: WorkStates.COLLECT,
                 condition: (creep) => creep.store[RESOURCE_ENERGY] === 0
             }
