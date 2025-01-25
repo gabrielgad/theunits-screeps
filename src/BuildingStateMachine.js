@@ -51,18 +51,28 @@ class BuildingStateMachine extends StateMachine {
             }
         }
 
-        // Third Priority: Roads
+        // Third Priority: Roads (with site limit)
         if (constructionSitesPlaced < MAX_SITES_PER_TICK && this.shouldBuildRoads()) {
-            const roadPositions = this.planRoadPositions();
-            for (let pos of roadPositions) {
-                if (constructionSitesPlaced >= MAX_SITES_PER_TICK) break;
-                if (this.canBuildStructureAt(pos)) {
-                    this.room.createConstructionSite(pos.x, pos.y, STRUCTURE_ROAD);
-                    constructionSitesPlaced++;
+            const existingRoadSites = this.room.find(FIND_CONSTRUCTION_SITES, {
+                filter: { structureType: STRUCTURE_ROAD }
+            });
+
+            if (existingRoadSites.length < 10) {  // Cap road construction sites at 10
+                const roadPositions = this.planRoadPositions();
+                const remainingRoadSites = 10 - existingRoadSites.length;
+                
+                for (let pos of roadPositions) {
+                    if (constructionSitesPlaced >= MAX_SITES_PER_TICK || 
+                        constructionSitesPlaced >= remainingRoadSites) break;
+                    if (this.canBuildStructureAt(pos)) {
+                        this.room.createConstructionSite(pos.x, pos.y, STRUCTURE_ROAD);
+                        constructionSitesPlaced++;
+                    }
                 }
             }
         }
     }
+
 
     needsExtensions(rcl) {
         const maxExtensions = CONTROLLER_STRUCTURES[STRUCTURE_EXTENSION][rcl];
@@ -77,37 +87,77 @@ class BuildingStateMachine extends StateMachine {
         const containers = this.room.find(FIND_STRUCTURES, {
             filter: { structureType: STRUCTURE_CONTAINER }
         });
-        return containers.length < sources.length;
+        // Need containers for: sources + controller + extension area
+        return containers.length < sources.length + 2;
     }
 
     planContainerPositions() {
         const positions = [];
-        const sources = this.room.find(FIND_SOURCES);
+        const spawn = this.room.find(FIND_MY_SPAWNS)[0];
         
+        // Add positions near sources
+        const sources = this.room.find(FIND_SOURCES);
         for (let source of sources) {
             const area = this.room.lookForAtArea(LOOK_TERRAIN,
                 source.pos.y - 1, source.pos.x - 1,
                 source.pos.y + 1, source.pos.x + 1, true);
             
+            // Find closest non-wall position to source
+            let bestPos = null;
+            let bestDistance = Infinity;
             for (let spot of area) {
                 if (spot.terrain !== 'wall') {
-                    positions.push(new RoomPosition(spot.x, spot.y, this.room.name));
+                    const pos = new RoomPosition(spot.x, spot.y, this.room.name);
+                    const distance = source.pos.getRangeTo(pos);
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        bestPos = pos;
+                    }
+                }
+            }
+            if (bestPos) positions.push(bestPos);
+        }
+
+        // Add position near controller
+        const controllerArea = this.room.lookForAtArea(LOOK_TERRAIN,
+            this.room.controller.pos.y - 1, this.room.controller.pos.x - 1,
+            this.room.controller.pos.y + 1, this.room.controller.pos.x + 1, true);
+        
+        let bestControllerPos = null;
+        let bestControllerDistance = Infinity;
+        for (let spot of controllerArea) {
+            if (spot.terrain !== 'wall') {
+                const pos = new RoomPosition(spot.x, spot.y, this.room.name);
+                const distance = this.room.controller.pos.getRangeTo(pos);
+                if (distance < bestControllerDistance) {
+                    bestControllerDistance = distance;
+                    bestControllerPos = pos;
                 }
             }
         }
+        if (bestControllerPos) positions.push(bestControllerPos);
+
+        // Add position near extensions
+        const extensionCenter = this.findExtensionPosition(spawn.pos);
+        if (extensionCenter) {
+            positions.push(extensionCenter);
+        }
+        
         return positions;
     }
 
     planRoadPositions() {
-        const positions = [];
+        const positions = new Set();
         const spawn = this.room.find(FIND_MY_SPAWNS)[0];
-        if (!spawn) return positions;
+        if (!spawn) return Array.from(positions);
 
+        // Only get paths to sources and controller, not every extension
         const destinations = [
             ...this.room.find(FIND_SOURCES),
             this.room.controller
         ];
 
+        // Find paths between spawn and each destination
         for (let dest of destinations) {
             const path = spawn.pos.findPathTo(dest, {
                 ignoreCreeps: true,
@@ -115,11 +165,29 @@ class BuildingStateMachine extends StateMachine {
             });
             
             for (let step of path) {
-                positions.push(new RoomPosition(step.x, step.y, this.room.name));
+                positions.add(`${step.x},${step.y}`);
             }
         }
         
-        return positions;
+        // Add just a few strategic roads near extensions rather than paths to each one
+        const extensionArea = this.findExtensionPosition(spawn.pos);
+        if (extensionArea) {
+            // Add a single path to the extension area
+            const pathToExtensions = spawn.pos.findPathTo(extensionArea, {
+                ignoreCreeps: true,
+                swampCost: 2
+            });
+            
+            for (let step of pathToExtensions) {
+                positions.add(`${step.x},${step.y}`);
+            }
+        }
+        
+        // Convert Set back to RoomPositions
+        return Array.from(positions).map(pos => {
+            const [x, y] = pos.split(',').map(Number);
+            return new RoomPosition(x, y, this.room.name);
+        });
     }
 
     findExtensionPosition(spawnPos) {
@@ -154,13 +222,7 @@ class BuildingStateMachine extends StateMachine {
     }
 
     shouldBuildRoads() {
-        if (this.room.controller.level < 2) return false;
-        
-        const roads = this.room.find(FIND_STRUCTURES, {
-            filter: { structureType: STRUCTURE_ROAD }
-        });
-
-        return roads.length < 10;
+        return this.room.controller.level >= 2;
     }
 }
 
