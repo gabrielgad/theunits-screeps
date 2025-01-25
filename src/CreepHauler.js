@@ -1,10 +1,10 @@
 class CreepHauler {
     static calculateTarget(roomState) {
         // Calculate based on number of sources and room level
-        // Start with 1 hauler per source, scale up with room level
+        // Scale up more aggressively with room level
         let target = Math.min(
-            roomState.sources,
-            Math.floor(roomState.roomLevel * 1.2)
+            roomState.sources * 2,  // Double the base haulers per source
+            Math.floor(roomState.roomLevel * 1.8)  // Increased from 1.2 to 1.8
         );
         
         // Ensure at least 1 hauler if we have active sources
