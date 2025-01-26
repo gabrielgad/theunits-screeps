@@ -1,7 +1,7 @@
 const BuildingStateMachine = require('BuildingStateMachine');
 const CreepStateMachine = require('CreepStateMachine');
 const JobStateMachine = require('JobStateMachine');
-const remoteMiningState = require('RemoteMiningStateMachine');
+const RemoteMiningStateMachine = require('RemoteMiningStateMachine');
 
 class RoomController {
     constructor(room) {
