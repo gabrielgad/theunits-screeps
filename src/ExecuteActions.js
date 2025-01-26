@@ -6,6 +6,8 @@ const ExecuteCollect = require('ExecuteCollect');
 const ExecuteRepair = require('ExecuteRepair');
 const ExecutePickup = require('ExecutePickup');
 const ExecuteDeliver = require('ExecuteDeliver');
+const ExecutePatrol = require('ExecutePatrol');
+const ExecuteAttack = require('ExecuteAttack');
 
 const ExecuteActions = {
     executeState(creep, state) {
@@ -26,10 +28,14 @@ const ExecuteActions = {
                 return ExecutePickup.execute(creep);
             case 'DELIVER':
                 return ExecuteDeliver.execute(creep);
+            case 'PATROL':
+                return ExecutePatrol.execute(creep);
+            case 'ATTACK':
+                return ExecuteAttack.execute(creep);
             default:
                 console.log(`Unknown state ${state} for creep ${creep.name}`);
+            }
         }
-    }
-};
+    };
 
 module.exports = ExecuteActions;

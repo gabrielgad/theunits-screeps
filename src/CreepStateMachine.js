@@ -4,6 +4,7 @@ const CreepBuilder = require('CreepBuilder');
 const CreepUpgrader = require('CreepUpgrader');
 const CreepRepairer = require('CreepRepairer');
 const CreepHauler = require('CreepHauler');
+const CreepMelee = require('CreepMelee');
 
 class CreepStateMachine extends StateMachine {
     constructor(room) {
@@ -19,7 +20,8 @@ class CreepStateMachine extends StateMachine {
             hauler: 0,
             builder: 0,
             upgrader: 0,
-            repairer: 0
+            repairer: 0,
+            melee: 0
         };
     }
 
@@ -47,6 +49,7 @@ class CreepStateMachine extends StateMachine {
     getCurrentPopulation() {
         const population = {
             harvester: 0,
+            Melee: 0,
             hauler: 0,
             builder: 0,
             upgrader: 0,
@@ -68,6 +71,7 @@ class CreepStateMachine extends StateMachine {
         
         targets.harvester = CreepHarvester.calculateTarget(roomState);
         targets.hauler = CreepHauler.calculateTarget(roomState);
+        targets.Melee = CreepMelee.calculateTarget(roomState);
         targets.builder = CreepBuilder.calculateTarget(roomState);
         targets.upgrader = CreepUpgrader.calculateTarget(roomState);
         targets.repairer = CreepRepairer.calculateTarget(roomState);
@@ -85,6 +89,7 @@ class CreepStateMachine extends StateMachine {
         const creepTypes = {
             harvester: { Class: CreepHarvester, priority: 1 },
             hauler: { Class: CreepHauler, priority: 1 },
+            melee: { Class: CreepMelee, priority: 2 },
             builder: { Class: CreepBuilder, priority: 3 },
             upgrader: { Class: CreepUpgrader, priority: 4 },
             repairer: { Class: CreepRepairer, priority: 3 }

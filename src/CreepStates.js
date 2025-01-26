@@ -5,8 +5,10 @@ const WorkStates = {
     COLLECT: 'COLLECT',
     UPGRADE: 'UPGRADE',
     REPAIR: 'REPAIR',
-    PICKUP: 'PICKUP',     // New state for haulers picking up resources
-    DELIVER: 'DELIVER'    // New state for haulers delivering resources
+    PICKUP: 'PICKUP',
+    DELIVER: 'DELIVER',
+    PATROL: 'PATROL',
+    ATTACK: 'ATTACK'
 };
 
 const CreepStates = {
@@ -81,6 +83,27 @@ const CreepStates = {
             [WorkStates.REPAIR]: {
                 nextState: WorkStates.COLLECT,
                 condition: (creep) => creep.store[RESOURCE_ENERGY] === 0
+            }
+        }
+    },
+
+    melee: {
+        states: [WorkStates.PATROL, WorkStates.ATTACK],
+        initialState: WorkStates.PATROL,
+        transitions: {
+            [WorkStates.PATROL]: {
+                nextState: WorkStates.ATTACK,
+                condition: (creep) => {
+                    const hostiles = creep.room.find(FIND_HOSTILE_CREEPS);
+                    return hostiles.length > 0;
+                }
+            },
+            [WorkStates.ATTACK]: {
+                nextState: WorkStates.PATROL,
+                condition: (creep) => {
+                    const hostiles = creep.room.find(FIND_HOSTILE_CREEPS);
+                    return hostiles.length === 0;
+                }
             }
         }
     }
