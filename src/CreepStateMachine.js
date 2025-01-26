@@ -49,7 +49,7 @@ class CreepStateMachine extends StateMachine {
     getCurrentPopulation() {
         const population = {
             harvester: 0,
-            Melee: 0,
+            melee: 0,
             hauler: 0,
             builder: 0,
             upgrader: 0,
@@ -71,7 +71,7 @@ class CreepStateMachine extends StateMachine {
         
         targets.harvester = CreepHarvester.calculateTarget(roomState);
         targets.hauler = CreepHauler.calculateTarget(roomState);
-        targets.Melee = CreepMelee.calculateTarget(roomState);
+        targets.melee = CreepMelee.calculateTarget(roomState);
         targets.builder = CreepBuilder.calculateTarget(roomState);
         targets.upgrader = CreepUpgrader.calculateTarget(roomState);
         targets.repairer = CreepRepairer.calculateTarget(roomState);

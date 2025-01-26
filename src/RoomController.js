@@ -2,6 +2,7 @@ const BuildingStateMachine = require('BuildingStateMachine');
 const CreepStateMachine = require('CreepStateMachine');
 const JobStateMachine = require('JobStateMachine');
 const RemoteMiningStateMachine = require('RemoteMiningStateMachine');
+const BuildingExecutiveStateMachine = require('BuildingExecutiveStateMachine');
 
 class RoomController {
     constructor(room) {
@@ -12,6 +13,7 @@ class RoomController {
         this.creepState = new CreepStateMachine(room);
         this.jobState = new JobStateMachine(room);
         this.remoteMiningState = new RemoteMiningStateMachine(room);
+        this.buildingExecState = new BuildingExecutiveStateMachine(room);
     }
 
     run() {
@@ -22,11 +24,14 @@ class RoomController {
         
         // 3. Assign and execute jobs for existing creeps
         this.jobState.run();
+
+        // 4. Manages the execution of building operations
+        this.buildingExecState.run();
         
-        // 4. Plan and manage construction
+        // 5. Plan and manage construction
         this.buildingState.run();
 
-        // 5. Execute potential Remote Mining
+        // 6. Execute potential Remote Mining
         this.remoteMiningState.run();
     }
 }
