@@ -1,5 +1,4 @@
 class ExecuteRepair {
-    // Define structure type priorities (higher = more important)
     static STRUCTURE_PRIORITIES = {
         [STRUCTURE_SPAWN]: 100,
         [STRUCTURE_EXTENSION]: 90,
@@ -9,31 +8,37 @@ class ExecuteRepair {
         [STRUCTURE_CONTAINER]: 70,
         [STRUCTURE_ROAD]: 60,
         [STRUCTURE_RAMPART]: 40,
-        [STRUCTURE_WALL]: 30
+        [STRUCTURE_WALL]: 40  // Set equal to ramparts
     };
 
-    // Calculate priority score for a structure
     static calculatePriority(structure) {
         const basePriority = this.STRUCTURE_PRIORITIES[structure.structureType] || 50;
         const hpPercent = structure.hits / structure.hitsMax;
         
-        // Exponentially increase priority as HP gets lower
+        // Different calculation for defensive structures
+        if (structure.structureType === STRUCTURE_WALL || structure.structureType === STRUCTURE_RAMPART) {
+            // Use absolute HP for defensive structures instead of percentage
+            const targetHp = 300000; // Target HP for defensive structures
+            const hpFactor = Math.max(0, 1 - (structure.hits / targetHp));
+            return basePriority * (1 + hpFactor);
+        }
+        
+        // Regular structures use percentage-based priority
         const hpFactor = Math.pow(1 - hpPercent, 2);
-        
-        // Urgent repair needed if below 10% HP
         const urgencyBonus = hpPercent < 0.1 ? 50 : 0;
-        
-        // Calculate final priority score
         return basePriority * (1 + hpFactor) + urgencyBonus;
     }
 
     static execute(creep) {
-        // Find all damaged structures
         const damagedStructures = creep.room.find(FIND_STRUCTURES, {
-            filter: structure => structure.hits < structure.hitsMax
+            filter: structure => {
+                if (structure.structureType === STRUCTURE_WALL || structure.structureType === STRUCTURE_RAMPART) {
+                    return structure.hits < 300000; // Only repair if below target
+                }
+                return structure.hits < structure.hitsMax;
+            }
         });
 
-        // Calculate priority scores and sort structures
         const prioritizedTargets = damagedStructures
             .map(structure => ({
                 structure: structure,
@@ -41,7 +46,6 @@ class ExecuteRepair {
             }))
             .sort((a, b) => b.priority - a.priority);
 
-        // Get the highest priority target
         const target = prioritizedTargets.length > 0 ? 
             prioritizedTargets[0].structure : null;
 
@@ -51,7 +55,6 @@ class ExecuteRepair {
                     visualizePathStyle: {stroke: '#ffffff'}
                 });
             }
-            // Optionally visualize repair priority
             creep.room.visual.text(
                 `${Math.round(prioritizedTargets[0].priority)}`,
                 target.pos.x,
@@ -59,7 +62,6 @@ class ExecuteRepair {
                 {color: 'green', font: 0.5}
             );
         } else {
-            // If no structures need repair, act as a backup builder
             const constructionSite = creep.pos.findClosestByPath(FIND_CONSTRUCTION_SITES);
             if(constructionSite) {
                 if(creep.build(constructionSite) === ERR_NOT_IN_RANGE) {
