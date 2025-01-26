@@ -19,29 +19,33 @@ class CreepRepairer {
             return sum + (1 - (structure.hits / structure.hitsMax));
         }, 0);
 
-        // Adjusted rampart calculation to scale better with large numbers
+        // Reduced rampart scaling significantly
         let rampartDamageRatio = ramparts.reduce((sum, structure) => {
             return sum + (1 - (structure.hits / structure.hitsMax));
-        }, 0) * 0.5; // Reduced multiplier but added count-based scaling below
+        }, 0) * 0.2; // Reduced from 0.5 to 0.2
 
-        // Add bonus based on number of ramparts
-        let rampartCountBonus = Math.ceil(ramparts.length / 4);
+        // Smaller rampart count bonus
+        let rampartCountBonus = Math.ceil(ramparts.length / 8); // Changed from 4 to 8
         
-        let baseTarget = Math.ceil((regularDamageRatio + rampartDamageRatio) / 2);
+        let baseTarget = Math.ceil((regularDamageRatio + rampartDamageRatio) / 3); // Changed from 2 to 3
         
-        // Scale max repairers based on RCL and rampart count
-        let maxRepairers = Math.floor(roomState.roomLevel * 1.5) + 
-            (ramparts.length > 0 ? Math.min(Math.ceil(ramparts.length / 5), roomState.roomLevel) : 0);
+        // Reduced max repairers scaling
+        let maxRepairers = Math.min(
+            Math.floor(roomState.roomLevel * 0.75) + // Changed from 1.5 to 0.75
+            (ramparts.length > 0 ? Math.min(Math.ceil(ramparts.length / 8), roomState.roomLevel / 2) : 0),
+            roomState.roomLevel // Hard cap at RCL
+        );
 
         let target = Math.min(
             baseTarget + rampartCountBonus,
             maxRepairers
         );
 
-        return Math.max(1, target);
+        return Math.max(1, Math.min(target, 3)); // Added upper limit of 3 repairers
     }
 
     static getBody(energy) {
+        // Body configurations remain unchanged as they're well balanced
         const bodies = [
             { cost: 200, body: [WORK, CARRY, MOVE] },
             { cost: 300, body: [WORK, CARRY, CARRY, MOVE, MOVE] },

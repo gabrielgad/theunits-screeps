@@ -6,26 +6,25 @@ class ExecuteRepair {
         [STRUCTURE_STORAGE]: 80,
         [STRUCTURE_TERMINAL]: 75,
         [STRUCTURE_CONTAINER]: 70,
-        [STRUCTURE_ROAD]: 60,
-        [STRUCTURE_RAMPART]: 40,
-        [STRUCTURE_WALL]: 40  // Set equal to ramparts
+        [STRUCTURE_ROAD]: 50,    // Lowered from 60
+        [STRUCTURE_RAMPART]: 30, // Lowered from 40
+        [STRUCTURE_WALL]: 25     // Lowered from 40
     };
 
     static calculatePriority(structure) {
         const basePriority = this.STRUCTURE_PRIORITIES[structure.structureType] || 50;
         const hpPercent = structure.hits / structure.hitsMax;
         
-        // Different calculation for defensive structures
+        // Defensive structures
         if (structure.structureType === STRUCTURE_WALL || structure.structureType === STRUCTURE_RAMPART) {
-            // Use absolute HP for defensive structures instead of percentage
-            const targetHp = 300000; // Target HP for defensive structures
+            const targetHp = 100000; // Lowered from 300000 for early game
             const hpFactor = Math.max(0, 1 - (structure.hits / targetHp));
-            return basePriority * (1 + hpFactor);
+            return basePriority * (1 + hpFactor * 0.5); // Reduced multiplier
         }
         
-        // Regular structures use percentage-based priority
-        const hpFactor = Math.pow(1 - hpPercent, 2);
-        const urgencyBonus = hpPercent < 0.1 ? 50 : 0;
+        // Regular structures
+        const hpFactor = Math.pow(1 - hpPercent, 3); // Increased power for more extreme scaling
+        const urgencyBonus = hpPercent < 0.3 ? 40 : 0; // Changed threshold and bonus
         return basePriority * (1 + hpFactor) + urgencyBonus;
     }
 
@@ -33,9 +32,10 @@ class ExecuteRepair {
         const damagedStructures = creep.room.find(FIND_STRUCTURES, {
             filter: structure => {
                 if (structure.structureType === STRUCTURE_WALL || structure.structureType === STRUCTURE_RAMPART) {
-                    return structure.hits < 300000; // Only repair if below target
+                    return structure.hits < 100000; // Lowered target
                 }
-                return structure.hits < structure.hitsMax;
+                // Ignore nearly-full structures
+                return structure.hits < structure.hitsMax * 0.9;
             }
         });
 
