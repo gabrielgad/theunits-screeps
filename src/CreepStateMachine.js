@@ -31,7 +31,6 @@ class CreepStateMachine extends StateMachine {
 
     analyzeRoomState() {
         const allSpawns = this.room.find(FIND_MY_SPAWNS);
-        console.log('All spawns in room:', allSpawns.length);
         
         return {
             room: this.room,
@@ -77,8 +76,6 @@ class CreepStateMachine extends StateMachine {
     }
 
     processSpawning(roomState) {
-        console.log('Starting spawn process:', roomState.room.name);
-        console.log('Energy available:', roomState.energyAvailable);
         console.log('Current population:', JSON.stringify(roomState.currentPopulation));
         console.log('Target population:', JSON.stringify(this.memory[this.name].populationTargets));
     
