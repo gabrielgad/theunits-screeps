@@ -5,7 +5,7 @@ class ControllerTower {
                 const target = this.findClosestHostile(tower, roomState.hostiles);
                 tower.attack(target);
             } else if (roomState.damagedStructures.length > 0) {
-                const target = this.findMostDamagedStructure(roomState.damagedStructures);
+                const target = this.findPriorityRepairTarget(roomState.damagedStructures);
                 tower.repair(target);
             } else {
                 const target = this.findEnergyNeedingStructure(tower);
@@ -20,10 +20,41 @@ class ControllerTower {
         return tower.pos.findClosestByRange(hostiles);
     }
 
-    static findMostDamagedStructure(structures) {
-        return structures.reduce((most, current) => 
-            (current.hits / current.hitsMax < most.hits / most.hitsMax) ? current : most
-        );
+    static findPriorityRepairTarget(structures) {
+        // Priority groups
+        const priorities = {
+            high: ['rampart', 'spawn', 'storage', 'terminal'],
+            medium: ['extension', 'container', 'road'],
+            low: ['constructedWall']
+        };
+
+        // Find most damaged structure in each priority group
+        for (const group of Object.keys(priorities)) {
+            const groupStructures = structures.filter(s => 
+                priorities[group].includes(s.structureType)
+            );
+            
+            if (groupStructures.length > 0) {
+                const mostDamaged = groupStructures.reduce((most, current) => {
+                    const currentDamageRatio = current.hits / current.hitsMax;
+                    const mostDamageRatio = most.hits / most.hitsMax;
+                    return currentDamageRatio < mostDamageRatio ? current : most;
+                });
+
+                // Only repair if below certain thresholds
+                const repairThresholds = {
+                    high: 0.9,    // 90% health
+                    medium: 0.7,  // 70% health
+                    low: 0.1     // 10% health
+                };
+
+                if (mostDamaged.hits / mostDamaged.hitsMax < repairThresholds[group]) {
+                    return mostDamaged;
+                }
+            }
+        }
+        
+        return null;
     }
 
     static findEnergyNeedingStructure(tower) {
