@@ -30,6 +30,9 @@ class CreepStateMachine extends StateMachine {
     }
 
     analyzeRoomState() {
+        const allSpawns = this.room.find(FIND_MY_SPAWNS);
+        console.log('All spawns in room:', allSpawns.length);
+        
         return {
             room: this.room,
             energyAvailable: this.room.energyAvailable,
@@ -38,9 +41,7 @@ class CreepStateMachine extends StateMachine {
             constructionSites: this.room.find(FIND_CONSTRUCTION_SITES).length,
             currentPopulation: this.getCurrentPopulation(),
             roomLevel: this.room.controller.level,
-            availableSpawns: this.room.find(FIND_MY_SPAWNS, {
-                filter: spawn => !spawn.spawning
-            })
+            availableSpawns: allSpawns.filter(spawn => !spawn.spawning)
         };
     }
 
@@ -76,8 +77,10 @@ class CreepStateMachine extends StateMachine {
     }
 
     processSpawning(roomState) {
-        if (roomState.availableSpawns.length === 0) return;
-        if (roomState.energyAvailable < roomState.energyCapacity) return;
+        console.log('Starting spawn process:', roomState.room.name);
+        console.log('Energy available:', roomState.energyAvailable);
+        console.log('Current population:', JSON.stringify(roomState.currentPopulation));
+        console.log('Target population:', JSON.stringify(this.memory[this.name].populationTargets));
     
         const targets = this.memory[this.name].populationTargets;
         const current = roomState.currentPopulation;
@@ -97,25 +100,31 @@ class CreepStateMachine extends StateMachine {
                 priority: config.priority,
                 Class: config.Class
             }))
-            .filter(p => p.needed)
-            .sort((a, b) => a.priority - b.priority)[0];
+            .filter(p => p.needed);
+        
+        console.log('Creeps needed:', JSON.stringify(toSpawn));
     
-        if (toSpawn) {
+        if (toSpawn.length > 0 && roomState.availableSpawns.length > 0) {
+            const selectedCreep = toSpawn.sort((a, b) => a.priority - b.priority)[0];
+            console.log('Selected to spawn:', selectedCreep.role);
+            
             const spawn = roomState.availableSpawns[0];
-            const body = toSpawn.Class.getBody(roomState.energyCapacity);
-            const name = toSpawn.role + Game.time;
+            const body = selectedCreep.Class.getBody(roomState.energyAvailable);
+            const name = selectedCreep.role + Game.time;
+            
+            console.log('Attempting to spawn with body:', JSON.stringify(body));
             
             const result = spawn.spawnCreep(body, name, {
                 memory: {
-                    role: toSpawn.role,
+                    role: selectedCreep.role,
                     working: false,
                     room: this.room.name
                 }
             });
-
-            if (result === OK) {
-                console.log(`${this.room.name} spawning new ${toSpawn.role}: ${name}`);
-            }
+    
+            console.log('Spawn result:', result);
+        } else {
+            console.log('No creeps needed or no spawns available');
         }
     }
 }
