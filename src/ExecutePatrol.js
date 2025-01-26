@@ -1,30 +1,26 @@
 class ExecutePatrol {
     static execute(creep) {
-        const flags = creep.room.find(FIND_FLAGS, {
-            filter: f => f.name.startsWith('Patrol')
-        });
-        
-        if (flags.length > 0) {
-            const currentFlagIndex = creep.memory.patrolIndex || 0;
-            const targetFlag = flags[currentFlagIndex];
-            
-            if (creep.pos.isEqualTo(targetFlag.pos)) {
-                creep.memory.patrolIndex = (currentFlagIndex + 1) % flags.length;
-            } else {
-                creep.moveTo(targetFlag, {
-                    visualizePathStyle: {stroke: '#ffffff'}
-                });
-            }
-        } else {
-            // Default patrol around spawn if no flags
-            const spawn = creep.pos.findClosestByPath(FIND_MY_SPAWNS);
-            if (spawn && creep.pos.getRangeTo(spawn) > 5) {
-                creep.moveTo(spawn, {
-                    visualizePathStyle: {stroke: '#ffffff'}
-                });
-            }
+        // Initialize random move timer if not set
+        if (!creep.memory.moveTimer) {
+            creep.memory.moveTimer = 0;
         }
+ 
+        // Decrement timer and get new direction if expired
+        if (--creep.memory.moveTimer <= 0) {
+            creep.memory.direction = Math.floor(Math.random() * 8);
+            creep.memory.moveTimer = 10; // Move in this direction for 10 ticks
+        }
+ 
+        // Stay within 10 tiles of spawn
+        const spawn = creep.pos.findClosestByPath(FIND_MY_SPAWNS);
+        if (spawn && creep.pos.getRangeTo(spawn) > 10) {
+            creep.moveTo(spawn);
+            return;
+        }
+ 
+        // Move in current random direction
+        creep.move(creep.memory.direction);
     }
-}
-
-module.exports = ExecutePatrol;
+ }
+ 
+ module.exports = ExecutePatrol;

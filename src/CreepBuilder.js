@@ -1,11 +1,9 @@
 class CreepBuilder {
     static calculateTarget(roomState) {
-        let target = Math.min(
-            Math.ceil(roomState.constructionSites / 5),
-            Math.floor(roomState.roomLevel * 1.5)
-        );
-        
-        return Math.max(roomState.constructionSites > 0 ? 1 : 0, target);
+        const body = this.getBody(roomState.energyAvailable);
+        const workParts = body.filter(part => part === WORK).length;
+        const sitesPerBuilder = workParts * 2;
+        return Math.max(1, Math.ceil(roomState.constructionSites / sitesPerBuilder));
     }
 
     static getBody(energy) {

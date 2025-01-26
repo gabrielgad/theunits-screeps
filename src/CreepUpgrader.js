@@ -1,6 +1,9 @@
 class CreepUpgrader {
     static calculateTarget(roomState) {
-        return Math.max(1, Math.floor(roomState.roomLevel * 0.75));
+        const body = this.getBody(roomState.energyAvailable);
+        const workParts = body.filter(part => part === WORK).length;
+        const desiredRate = Math.min(15, Math.pow(2, roomState.roomLevel - 1));
+        return Math.ceil(desiredRate / workParts);
     }
 
     static getBody(energy) {

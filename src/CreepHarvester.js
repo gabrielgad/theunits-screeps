@@ -1,26 +1,30 @@
 class CreepHarvester {
     static calculateTarget(roomState) {
-        // Use number of sources instead of spawns for harvester calculation
-        // Typically want 1-2 harvesters per source depending on room level
-        const harvestersPerSource = roomState.roomLevel <= 2 ? 1 : 2;
-        return roomState.sources * harvestersPerSource;
+        // Calculate how many work parts we're getting with current energy
+        const body = this.getBody(roomState.energyAvailable);
+        const workParts = body.filter(part => part === WORK).length;
+        
+        // Each source needs 5 work parts total for optimal harvesting
+        const workPartsNeeded = roomState.sources * 5;
+        
+        // Calculate needed harvesters based on work parts per harvester
+        return Math.ceil(workPartsNeeded / workParts);
     }
-
+    
     static getBody(energy) {
         const bodies = [
-            { cost: 200, body: [WORK, CARRY, MOVE] },              // Early game balanced
-            { cost: 300, body: [WORK, WORK, CARRY, MOVE] },        // Early game source-sitter
-            { cost: 400, body: [WORK, WORK, WORK, CARRY, MOVE] },  // Better harvesting
-            { cost: 550, body: [WORK, WORK, WORK, WORK, CARRY, MOVE] }, // Strong harvesting
-            { cost: 700, body: [WORK, WORK, WORK, WORK, WORK, CARRY, MOVE] }, // Max harvesting
-            { cost: 800, body: [WORK, WORK, WORK, WORK, WORK, CARRY, CARRY, MOVE] }  // Max harvesting + extra carry
+            { cost: 200, body: [WORK, CARRY, MOVE] },                    // 1 work
+            { cost: 300, body: [WORK, WORK, CARRY, MOVE] },             // 2 work
+            { cost: 400, body: [WORK, WORK, CARRY, CARRY, MOVE, MOVE] }, // 2 work, better mobility
+            { cost: 550, body: [WORK, WORK, WORK, CARRY, MOVE, MOVE] }, // 3 work
+            { cost: 700, body: [WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE] }, // 4 work
+            { cost: 800, body: [WORK, WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE] }  // 5 work
         ];
-
-        const selected = bodies
+        
+        return bodies
             .filter(config => config.cost <= energy)
             .reduce((best, current) => 
-                current.cost > best.cost ? current : best, bodies[0]);
-        return selected.body;
+                current.cost > best.cost ? current : best, bodies[0]).body;
     }
 }
 
