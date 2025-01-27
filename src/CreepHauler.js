@@ -3,9 +3,8 @@ class CreepHauler {
         const body = this.getBody(roomState.energyAvailable);
         const carryCapacity = body.filter(part => part === CARRY).length * 50;
         const sourceOutput = roomState.sources * 10;
-        return Math.ceil((sourceOutput * 50) / carryCapacity);   
+        return Math.min(4, Math.ceil((sourceOutput * 20) / carryCapacity)); // Reduced buffer from 50 to 20 ticks
     }
-
     static getBody(energy) {
         const bodies = [
             { cost: 200, body: [CARRY, CARRY, MOVE, MOVE] },                    // Basic hauler: 100 capacity

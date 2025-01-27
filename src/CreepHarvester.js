@@ -1,14 +1,21 @@
 class CreepHarvester {
     static calculateTarget(roomState) {
-        // Calculate how many work parts we're getting with current energy
-        const body = this.getBody(roomState.energyAvailable);
-        const workParts = body.filter(part => part === WORK).length;
-        
-        // Each source needs 5 work parts total for optimal harvesting
+        // Each source needs 5 work parts
         const workPartsNeeded = roomState.sources * 5;
         
-        // Calculate needed harvesters based on work parts per harvester
-        return Math.ceil(workPartsNeeded / workParts);
+        // Count existing work parts
+        const existingWorkParts = _.sum(Object.values(Game.creeps).filter(creep => 
+            creep.memory.role === 'harvester' && 
+            creep.room.name === roomState.room.name
+        ), creep => creep.getActiveBodyparts(WORK));
+        
+        // Calculate work parts per new harvester using max energy
+        const body = this.getBody(roomState.energyCapacity);
+        const workPartsPerHarvester = body.filter(part => part === WORK).length;
+        
+        // Only spawn new harvesters if we need more work parts
+        const additionalWorkPartsNeeded = Math.max(0, workPartsNeeded - existingWorkParts);
+        return Math.ceil(additionalWorkPartsNeeded / workPartsPerHarvester);
     }
     
     static getBody(energy) {

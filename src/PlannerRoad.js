@@ -19,12 +19,82 @@ class PlannerRoad {
         this.analyzeTrafficPatterns();
         this.planCriticalPaths(positions);
         this.planExtensionNetwork(positions);
+        this.planCrossSections(positions);
         this.planHighTrafficPaths(positions);
 
         return Array.from(positions).map(pos => {
             const [x, y] = pos.split(',').map(Number);
             return new RoomPosition(x, y, this.room.name);
         });
+    }
+
+    planCrossSections(positions) {
+        const extensions = this.room.find(FIND_MY_STRUCTURES, {
+            filter: { structureType: STRUCTURE_EXTENSION }
+        });
+        
+        if (extensions.length === 0) return;
+
+        // Group extensions by their radius from spawn
+        const spawn = this.room.find(FIND_MY_SPAWNS)[0];
+        const extensionsByRadius = new Map();
+        
+        for (let ext of extensions) {
+            const radius = Math.abs(ext.pos.x - spawn.pos.x) + Math.abs(ext.pos.y - spawn.pos.y);
+            if (!extensionsByRadius.has(radius)) {
+                extensionsByRadius.set(radius, []);
+            }
+            extensionsByRadius.get(radius).push(ext);
+        }
+
+        // For each radius, connect extensions at cardinal points
+        for (let [radius, exts] of extensionsByRadius) {
+            if (radius <= 2) continue;
+
+            const cardinalPoints = this.findCardinalExtensions(exts, spawn.pos);
+            
+            for (let i = 0; i < cardinalPoints.length; i++) {
+                const start = cardinalPoints[i];
+                const end = cardinalPoints[(i + 1) % cardinalPoints.length];
+                
+                if (start && end) {
+                    const path = PathFinder.search(start.pos, { pos: end.pos, range: 1 }, {
+                        plainCost: 2,
+                        swampCost: 10,
+                        roomCallback: this.getRoomCallback.bind(this)
+                    }).path;
+
+                    for (let pos of path) {
+                        positions.add(`${pos.x},${pos.y}`);
+                    }
+                }
+            }
+        }
+    }
+
+    findCardinalExtensions(extensions, center) {
+        const cardinals = Array(4).fill(null); // N, E, S, W
+
+        for (let ext of extensions) {
+            const dx = ext.pos.x - center.x;
+            const dy = ext.pos.y - center.y;
+            
+            if (Math.abs(dx) > Math.abs(dy)) {
+                if (dx > 0 && (!cardinals[1] || dx < Math.abs(cardinals[1].pos.x - center.x))) {
+                    cardinals[1] = ext; // East
+                } else if (!cardinals[3] || Math.abs(dx) < Math.abs(cardinals[3].pos.x - center.x)) {
+                    cardinals[3] = ext; // West
+                }
+            } else if (Math.abs(dy) > Math.abs(dx)) {
+                if (dy > 0 && (!cardinals[2] || dy < Math.abs(cardinals[2].pos.y - center.y))) {
+                    cardinals[2] = ext; // South
+                } else if (!cardinals[0] || Math.abs(dy) < Math.abs(cardinals[0].pos.y - center.y)) {
+                    cardinals[0] = ext; // North
+                }
+            }
+        }
+
+        return cardinals;
     }
 
     analyzeTrafficPatterns() {

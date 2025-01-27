@@ -1,6 +1,7 @@
 class PlannerExtension {
     constructor(room) {
         this.room = room;
+        this.plannedPositions = new Set();
     }
 
     needsExtensions(rcl) {
@@ -11,8 +12,7 @@ class PlannerExtension {
         return currentExtensions < maxExtensions;
     }
 
-    findNextPosition(spawnPos) {
-        const checked = new Set();
+    planLayout(spawnPos) {
         for (let radius = 2; radius < 6; radius++) {
             for (let x = -radius; x <= radius; x++) {
                 for (let y = -radius; y <= radius; y++) {
@@ -21,9 +21,9 @@ class PlannerExtension {
                         const newY = spawnPos.y + y;
                         const posKey = `${newX},${newY}`;
                         
-                        if (checked.has(posKey)) continue;
-                        checked.add(posKey);
-
+                        if (this.plannedPositions.has(posKey)) continue;
+                        this.plannedPositions.add(posKey);
+                        
                         const pos = new RoomPosition(newX, newY, this.room.name);
                         if (this.canBuildAt(pos)) {
                             return pos;
@@ -38,8 +38,16 @@ class PlannerExtension {
     canBuildAt(pos) {
         const structures = pos.lookFor(LOOK_STRUCTURES);
         const sites = pos.lookFor(LOOK_CONSTRUCTION_SITES);
-        return structures.length === 0 && sites.length === 0 && 
+        return structures.length === 0 && 
+               sites.length === 0 && 
                pos.lookFor(LOOK_TERRAIN)[0] !== 'wall';
+    }
+
+    getPlannedPositions() {
+        return Array.from(this.plannedPositions).map(pos => {
+            const [x, y] = pos.split(',').map(Number);
+            return new RoomPosition(x, y, this.room.name);
+        });
     }
 }
 

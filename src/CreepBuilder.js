@@ -1,9 +1,13 @@
 class CreepBuilder {
     static calculateTarget(roomState) {
-        const body = this.getBody(roomState.energyAvailable);
+        const sites = roomState.room.find(FIND_CONSTRUCTION_SITES);
+        const totalWork = _.sum(sites, site => site.progressTotal - site.progress);
+        
+        const body = this.getBody(roomState.energyCapacity);
         const workParts = body.filter(part => part === WORK).length;
-        const sitesPerBuilder = workParts * 2;
-        return Math.max(1, Math.ceil(roomState.constructionSites / sitesPerBuilder));
+        const workPerTick = workParts * 5; // Each WORK does 5 construction/tick
+        
+        return Math.max(1, Math.min(3, Math.ceil(totalWork / (workPerTick * 50)))); // 50 ticks buffer
     }
 
     static getBody(energy) {

@@ -1,8 +1,7 @@
 class CreepMelee {
     static calculateTarget(roomState) {
         const hostilePresence = roomState.room.find(FIND_HOSTILE_CREEPS).length > 0;
-        const baseMelee = Math.floor(roomState.roomLevel * 0.5);
-        return hostilePresence ? baseMelee + 2 : baseMelee;
+        return hostilePresence ? 2 : Math.min(1, Math.floor(roomState.roomLevel * 0.25));
     }
 
     static getBody(energy) {

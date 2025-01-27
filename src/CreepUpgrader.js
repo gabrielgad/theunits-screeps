@@ -1,9 +1,17 @@
 class CreepUpgrader {
     static calculateTarget(roomState) {
-        const body = this.getBody(roomState.energyAvailable);
+        const body = this.getBody(roomState.energyCapacity);
         const workParts = body.filter(part => part === WORK).length;
-        const desiredRate = Math.min(15, Math.pow(2, roomState.roomLevel - 1));
-        return Math.ceil(desiredRate / workParts);
+        
+        // Base number on RCL
+        let count = Math.ceil(roomState.roomLevel / 2);
+        
+        // Increase for RCL 8 rush
+        if (roomState.roomLevel === 7 && roomState.room.controller.progress / roomState.room.controller.progressTotal > 0.8) {
+            count += 1;
+        }
+        
+        return Math.min(count, 3);
     }
 
     static getBody(energy) {
