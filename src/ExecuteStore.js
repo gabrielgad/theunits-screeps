@@ -1,6 +1,6 @@
 class ExecuteStore {
     static execute(creep) {
-        // First priority: Nearby containers
+        // First priority: Nearby containers, prioritizing closest only
         const nearbyContainers = creep.pos.findInRange(FIND_STRUCTURES, 3, {
             filter: (structure) => {
                 return structure.structureType === STRUCTURE_CONTAINER &&
@@ -9,14 +9,11 @@ class ExecuteStore {
         });
 
         if(nearbyContainers.length > 0) {
-            const bestContainer = nearbyContainers.reduce((best, current) => 
-                current.store.getFreeCapacity(RESOURCE_ENERGY) > best.store.getFreeCapacity(RESOURCE_ENERGY) 
-                    ? current 
-                    : best
-            );
+            // Simply get the closest container
+            const closestContainer = creep.pos.findClosestByRange(nearbyContainers);
             
-            if(creep.transfer(bestContainer, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
-                creep.moveTo(bestContainer, {
+            if(creep.transfer(closestContainer, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                creep.moveTo(closestContainer, {
                     visualizePathStyle: {stroke: '#ffaa00'}
                 });
             }
@@ -40,8 +37,8 @@ class ExecuteStore {
             return;
         }
 
-        // Third priority: Spawns and Extensions
-        const spawnTarget = creep.pos.findClosestByPath(FIND_STRUCTURES, {
+        // Third priority: Spawns and Extensions, prioritizing closest
+        const spawnTargets = creep.room.find(FIND_STRUCTURES, {
             filter: (structure) => {
                 return (structure.structureType === STRUCTURE_SPAWN ||
                         structure.structureType === STRUCTURE_EXTENSION) &&
@@ -49,30 +46,37 @@ class ExecuteStore {
             }
         });
 
-        if(spawnTarget) {
-            if(creep.transfer(spawnTarget, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
-                creep.moveTo(spawnTarget, {
-                    visualizePathStyle: {stroke: '#ffffff'}
-                });
+        // Find the closest spawn/extension with capacity
+        if(spawnTargets.length > 0) {
+            const closestSpawn = creep.pos.findClosestByPath(spawnTargets);
+            if(closestSpawn) {
+                if(creep.transfer(closestSpawn, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                    creep.moveTo(closestSpawn, {
+                        visualizePathStyle: {stroke: '#ffffff'}
+                    });
+                }
+                return;
             }
-            return;
         }
 
-        // Fourth priority: Towers
-        const tower = creep.pos.findClosestByPath(FIND_STRUCTURES, {
+        // Fourth priority: Towers with less than 50% energy
+        const towers = creep.room.find(FIND_STRUCTURES, {
             filter: (structure) => {
                 return structure.structureType === STRUCTURE_TOWER &&
-                       structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0;
+                       structure.store.getFreeCapacity(RESOURCE_ENERGY) > structure.store.getCapacity(RESOURCE_ENERGY) * 0.5;
             }
         });
 
-        if(tower) {
-            if(creep.transfer(tower, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
-                creep.moveTo(tower, {
-                    visualizePathStyle: {stroke: '#ffffff'}
-                });
+        if(towers.length > 0) {
+            const closestTower = creep.pos.findClosestByPath(towers);
+            if(closestTower) {
+                if(creep.transfer(closestTower, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                    creep.moveTo(closestTower, {
+                        visualizePathStyle: {stroke: '#ffffff'}
+                    });
+                }
+                return;
             }
-            return;
         }
 
         // Fifth priority: Construction sites

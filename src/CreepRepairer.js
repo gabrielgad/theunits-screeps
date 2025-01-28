@@ -1,5 +1,20 @@
 class CreepRepairer {
     static calculateTarget(roomState) {
+        // Check for towers first
+        const towers = roomState.room.find(FIND_STRUCTURES, {
+            filter: structure => structure.structureType === STRUCTURE_TOWER
+        });
+
+        // If we have an active tower with decent energy, we likely don't need repairers
+        const activeTowers = towers.filter(tower => tower.store.getUsedCapacity(RESOURCE_ENERGY) > 400);
+        if (activeTowers.length > 0) {
+            // Check for structures far from towers that might need repair
+            const distantDamagedStructures = this.findDistantDamagedStructures(roomState.room, activeTowers);
+            if (distantDamagedStructures.length === 0) {
+                return 0; // No repairers needed if towers can handle everything
+            }
+        }
+
         const regularStructures = roomState.room.find(FIND_STRUCTURES, {
             filter: structure => {
                 return structure.hits < structure.hitsMax && 
@@ -15,24 +30,36 @@ class CreepRepairer {
             }
         });
 
+        // If we have towers, only consider structures that are far from towers
+        if (activeTowers.length > 0) {
+            const farStructures = regularStructures.filter(structure => 
+                !this.isInEffectiveTowerRange(structure.pos, activeTowers)
+            );
+            regularStructures.length = 0;
+            regularStructures.push(...farStructures);
+        }
+
         let regularDamageRatio = regularStructures.reduce((sum, structure) => {
             return sum + (1 - (structure.hits / structure.hitsMax));
         }, 0);
 
-        // Reduced rampart scaling significantly
-        let rampartDamageRatio = ramparts.reduce((sum, structure) => {
-            return sum + (1 - (structure.hits / structure.hitsMax));
-        }, 0) * 0.2; // Reduced from 0.5 to 0.2
+        // Only consider ramparts if they're far from towers or we have no towers
+        let rampartDamageRatio = 0;
+        if (activeTowers.length === 0 || ramparts.some(r => !this.isInEffectiveTowerRange(r.pos, activeTowers))) {
+            rampartDamageRatio = ramparts.reduce((sum, structure) => {
+                return sum + (1 - (structure.hits / structure.hitsMax));
+            }, 0) * 0.1; // Further reduced from 0.2 to 0.1 due to tower presence
+        }
 
-        // Smaller rampart count bonus
-        let rampartCountBonus = Math.ceil(ramparts.length / 8); // Changed from 4 to 8
+        // Smaller rampart count bonus, only if no towers or far ramparts exist
+        let rampartCountBonus = (activeTowers.length === 0) ? Math.ceil(ramparts.length / 10) : 0;
         
-        let baseTarget = Math.ceil((regularDamageRatio + rampartDamageRatio) / 3); // Changed from 2 to 3
+        let baseTarget = Math.ceil((regularDamageRatio + rampartDamageRatio) / 4); // Increased divisor from 3 to 4
         
-        // Reduced max repairers scaling
+        // Significantly reduced max repairers when towers exist
         let maxRepairers = Math.min(
-            Math.floor(roomState.roomLevel * 0.75) + // Changed from 1.5 to 0.75
-            (ramparts.length > 0 ? Math.min(Math.ceil(ramparts.length / 8), roomState.roomLevel / 2) : 0),
+            Math.floor(roomState.roomLevel * (activeTowers.length > 0 ? 0.3 : 0.75)) +
+            (ramparts.length > 0 ? Math.min(Math.ceil(ramparts.length / 10), roomState.roomLevel / 3) : 0),
             roomState.roomLevel // Hard cap at RCL
         );
 
@@ -41,11 +68,30 @@ class CreepRepairer {
             maxRepairers
         );
 
-        return Math.max(1, Math.min(target, 3)); // Added upper limit of 3 repairers
+        // More restrictive cap when towers exist
+        return Math.max(0, Math.min(target, activeTowers.length > 0 ? 1 : 2));
+    }
+
+    static isInEffectiveTowerRange(pos, towers) {
+        return towers.some(tower => {
+            const range = tower.pos.getRangeTo(pos);
+            // Tower effectiveness drops off with range
+            return range <= 5; // Only consider structures very close to towers
+        });
+    }
+
+    static findDistantDamagedStructures(room, towers) {
+        return room.find(FIND_STRUCTURES, {
+            filter: structure => {
+                if (structure.hits === structure.hitsMax) return false;
+                if (structure.structureType === STRUCTURE_WALL) return false;
+                // Check if structure is far from all towers
+                return !this.isInEffectiveTowerRange(structure.pos, towers);
+            }
+        });
     }
 
     static getBody(energy) {
-        // Body configurations remain unchanged as they're well balanced
         const bodies = [
             { cost: 200, body: [WORK, CARRY, MOVE] },
             { cost: 300, body: [WORK, CARRY, CARRY, MOVE, MOVE] },

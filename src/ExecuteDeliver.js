@@ -35,18 +35,7 @@ class ExecuteDeliver {
             return;
         }
 
-        // Third priority: Storage if available
-        const storage = creep.room.storage;
-        if(storage && storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-            if(creep.transfer(storage, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
-                creep.moveTo(storage, {
-                    visualizePathStyle: {stroke: '#ffffff'}
-                });
-            }
-            return;
-        }
-
-        // Fourth priority: Containers not near sources
+        // Third priority: Containers not near sources
         const containers = creep.room.find(FIND_STRUCTURES, {
             filter: structure => {
                 if (structure.structureType !== STRUCTURE_CONTAINER) return false;
@@ -64,6 +53,17 @@ class ExecuteDeliver {
                     visualizePathStyle: {stroke: '#ffffff'}
                 });
             }
+        }
+
+        // Fourth priority: Storage if available
+        const storage = creep.room.storage;
+        if(storage && storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+            if(creep.transfer(storage, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                creep.moveTo(storage, {
+                    visualizePathStyle: {stroke: '#ffffff'}
+                });
+            }
+            return;
         }
     }
 }
