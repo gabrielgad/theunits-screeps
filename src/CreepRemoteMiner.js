@@ -1,5 +1,7 @@
 class CreepRemoteMiner {
     static calculateTarget(roomState) {
+        if (!roomState.room.memory.remoteMiningActive) return 0;
+        
         return roomState.sources || 0;
     }
 

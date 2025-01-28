@@ -5,9 +5,6 @@ const CreepUpgrader = require('CreepUpgrader');
 const CreepRepairer = require('CreepRepairer');
 const CreepHauler = require('CreepHauler');
 const CreepMelee = require('CreepMelee');
-const CreepRemoteMiner = require('CreepRemoteMiner');
-const CreepRemoteHauler = require('CreepRemoteHauler');
-const CreepReserver = require('CreepReserver');
 
 class CreepStateMachine extends StateMachine {
     constructor(room) {
@@ -25,10 +22,7 @@ class CreepStateMachine extends StateMachine {
             builder: 0,
             upgrader: 0,
             repairer: 0,
-            melee: 0,
-            remoteMiner: 0,
-            remoteHauler: 0,
-            reserver: 0
+            melee: 0
         };
     }
 
@@ -61,10 +55,7 @@ class CreepStateMachine extends StateMachine {
             hauler: 0,
             builder: 0,
             upgrader: 0,
-            repairer: 0,
-            remoteMiner: 0,
-            remoteHauler: 0,
-            reserver: 0
+            repairer: 0
         };
 
         for (let name in Game.creeps) {
@@ -84,10 +75,7 @@ class CreepStateMachine extends StateMachine {
             melee: CreepMelee.calculateTarget(roomState),  // Only one melee calculation
             builder: CreepBuilder.calculateTarget(roomState),
             upgrader: CreepUpgrader.calculateTarget(roomState),
-            repairer: CreepRepairer.calculateTarget(roomState),
-            remoteMiner: CreepRemoteMiner.calculateTarget(roomState),
-            remoteHauler: CreepRemoteHauler.calculateTarget(roomState),
-            reserver: CreepReserver.calculateTarget(roomState)
+            repairer: CreepRepairer.calculateTarget(roomState)
         };
 
 
@@ -108,10 +96,7 @@ class CreepStateMachine extends StateMachine {
             melee: { Class: CreepMelee, priority: 2 },  // Consistent casing
             builder: { Class: CreepBuilder, priority: 3 },
             upgrader: { Class: CreepUpgrader, priority: 4 },
-            repairer: { Class: CreepRepairer, priority: 3 },
-            remoteMiner: { Class: CreepRemoteMiner, priority: 2 },
-            remoteHauler: { Class: CreepRemoteHauler, priority: 2 },
-            reserver: { Class: CreepReserver, priority: 3 }
+            repairer: { Class: CreepRepairer, priority: 3 }
         };
     
         const toSpawn = Object.entries(creepTypes)

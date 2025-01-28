@@ -3,7 +3,7 @@ class CreepRemoteHauler {
         const body = this.getBody(roomState.energyAvailable);
         const carryCapacity = body.filter(part => part === CARRY).length * 50;
         const sourceOutput = roomState.sources * 10;
-        // Increased buffer due to longer distance
+        
         return Math.min(6, Math.ceil((sourceOutput * 30) / carryCapacity));
     }
 
