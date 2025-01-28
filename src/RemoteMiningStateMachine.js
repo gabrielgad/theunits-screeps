@@ -5,45 +5,107 @@ const RemoteMiningStateMachine = class {
         this.targetRooms = this.memory.targetRooms || [];
         this.memory.miningPositions = this.memory.miningPositions || {};
         this.memory.reserverAssignments = this.memory.reserverAssignments || {};
-        this.memory.roomsNeedingScout = this.memory.roomsNeedingScout || new Set();
-        this.memory.profitableRooms = this.memory.profitableRooms || new Set();
+        this.memory.roomsNeedingScout = this.memory.roomsNeedingScout || [];
+        this.memory.profitableRooms = this.memory.profitableRooms || [];
+        this.memory.scoutAssignments = this.memory.scoutAssignments || {};
+        this.memory.minerAssignments = this.memory.minerAssignments || {};
     }
 
     run() {
+        this.cleanupMemory();
+        this.updateCreepAssignments();
+        
         for (const targetRoom of this.targetRooms) {
             this.manageRemoteRoom(targetRoom);
         }
-        this.cleanupMemory();
+    }
+
+    updateCreepAssignments() {
+        // Clear stale assignments
+        this.memory.scoutAssignments = {};
+        this.memory.minerAssignments = {};
+
+        // Update current assignments
+        for (const name in Game.creeps) {
+            const creep = Game.creeps[name];
+            if (creep.memory.homeRoom !== this.room.name) continue;
+
+            if (creep.memory.role === 'scout') {
+                this.memory.scoutAssignments[creep.memory.targetRoom] = creep.name;
+            }
+            else if (creep.memory.role === 'remoteMiner') {
+                if (!this.memory.minerAssignments[creep.memory.targetRoom]) {
+                    this.memory.minerAssignments[creep.memory.targetRoom] = [];
+                }
+                this.memory.minerAssignments[creep.memory.targetRoom].push(creep.name);
+            }
+        }
     }
 
     manageRemoteRoom(targetRoomName) {
         const room = Game.rooms[targetRoomName];
+        const hasScout = this.memory.scoutAssignments[targetRoomName];
         
-        // If we can't see the room, mark it for scouting
-        if (!room) {
-            this.memory.roomsNeedingScout.add(targetRoomName);
+        // If we can't see the room and don't have a scout assigned
+        if (!room && !hasScout) {
+            this.addRoomNeedingScout(targetRoomName);
+            this.removeProfitableRoom(targetRoomName);
+            return;
+        }
+
+        // If we have a scout assigned but still can't see the room, wait
+        if (!room && hasScout) {
             return;
         }
 
         // Once we can see the room, remove it from scouting needs
-        this.memory.roomsNeedingScout.delete(targetRoomName);
+        this.removeRoomNeedingScout(targetRoomName);
 
         if (!this.isRoomSafe(room)) {
             this.abandonRoom(targetRoomName);
             return;
         }
 
-        // Check profitability and update flags accordingly
+        // Check if room is profitable and needs miners
         if (this.isRoomProfitable(room)) {
-            this.memory.profitableRooms.add(targetRoomName);
+            const currentMiners = this.memory.minerAssignments[targetRoomName] 
+                ? this.memory.minerAssignments[targetRoomName].length 
+                : 0;
+            const sources = room.find(FIND_SOURCES);
+            
+            if (currentMiners < sources.length) {
+                this.addProfitableRoom(targetRoomName);
+            } else {
+                this.removeProfitableRoom(targetRoomName);
+            }
         } else {
-            this.memory.profitableRooms.delete(targetRoomName);
+            this.removeProfitableRoom(targetRoomName);
             this.abandonRoom(targetRoomName);
             return;
         }
 
         this.manageMiningInfrastructure(room);
         this.manageReserver(targetRoomName);
+    }
+
+    addRoomNeedingScout(roomName) {
+        if (!this.memory.roomsNeedingScout.includes(roomName)) {
+            this.memory.roomsNeedingScout.push(roomName);
+        }
+    }
+
+    removeRoomNeedingScout(roomName) {
+        this.memory.roomsNeedingScout = this.memory.roomsNeedingScout.filter(r => r !== roomName);
+    }
+
+    addProfitableRoom(roomName) {
+        if (!this.memory.profitableRooms.includes(roomName)) {
+            this.memory.profitableRooms.push(roomName);
+        }
+    }
+
+    removeProfitableRoom(roomName) {
+        this.memory.profitableRooms = this.memory.profitableRooms.filter(r => r !== roomName);
     }
 
     isRoomSafe(room) {
@@ -62,11 +124,19 @@ const RemoteMiningStateMachine = class {
     }
 
     getRoomsNeedingScout() {
-        return Array.from(this.memory.roomsNeedingScout);
+        return this.memory.roomsNeedingScout;
     }
 
     getProfitableRooms() {
-        return Array.from(this.memory.profitableRooms);
+        return this.memory.profitableRooms;
+    }
+
+    getAssignedScouts() {
+        return Object.values(this.memory.scoutAssignments);
+    }
+
+    getAssignedMiners(roomName) {
+        return this.memory.minerAssignments[roomName] || [];
     }
 
     manageMiningInfrastructure(room) {
@@ -107,15 +177,28 @@ const RemoteMiningStateMachine = class {
         const targetCount = CreepReserver.calculateTarget(roomState);
 
         if (reserverCount < targetCount) {
-            // The actual spawning will be handled by the CreepStateMachine
             room.memory.needsReserver = true;
         }
     }
 
     cleanupMemory() {
+        // Clean up creep memory
         for (const name in Memory.creeps) {
             if (!Game.creeps[name]) {
                 delete Memory.creeps[name];
+            }
+        }
+
+        // Clean up stale room assignments
+        for (const roomName in this.memory.minerAssignments) {
+            this.memory.minerAssignments[roomName] = this.memory.minerAssignments[roomName].filter(
+                name => Game.creeps[name]
+            );
+        }
+
+        for (const roomName in this.memory.scoutAssignments) {
+            if (!Game.creeps[this.memory.scoutAssignments[roomName]]) {
+                delete this.memory.scoutAssignments[roomName];
             }
         }
     }
@@ -124,8 +207,7 @@ const RemoteMiningStateMachine = class {
         if (!this.targetRooms.includes(roomName)) {
             this.targetRooms.push(roomName);
             this.memory.targetRooms = this.targetRooms;
-            // When adding a new target room, it initially needs scouting
-            this.memory.roomsNeedingScout.add(roomName);
+            this.addRoomNeedingScout(roomName);
         }
     }
 
@@ -134,8 +216,10 @@ const RemoteMiningStateMachine = class {
         this.memory.targetRooms = this.targetRooms;
         delete this.memory.miningPositions[roomName];
         delete this.memory.reserverAssignments[roomName];
-        this.memory.roomsNeedingScout.delete(roomName);
-        this.memory.profitableRooms.delete(roomName);
+        delete this.memory.minerAssignments[roomName];
+        delete this.memory.scoutAssignments[roomName];
+        this.removeRoomNeedingScout(roomName);
+        this.removeProfitableRoom(roomName);
     }
 
     abandonRoom(roomName) {
