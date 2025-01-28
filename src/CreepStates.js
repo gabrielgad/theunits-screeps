@@ -8,7 +8,12 @@ const WorkStates = {
     PICKUP: 'PICKUP',
     DELIVER: 'DELIVER',
     PATROL: 'PATROL',
-    ATTACK: 'ATTACK'
+    ATTACK: 'ATTACK',
+    REMOTE_HARVEST: 'REMOTE_HARVEST',
+    REMOTE_DELIVER: 'REMOTE_DELIVER',
+    REMOTE_HAUL: 'REMOTE_HAUL',
+    RESERVE: 'RESERVE',
+    TRAVEL_TO_ROOM: 'TRAVEL_TO_ROOM'
 };
 
 const CreepStates = {
@@ -104,6 +109,55 @@ const CreepStates = {
                     const hostiles = creep.room.find(FIND_HOSTILE_CREEPS);
                     return hostiles.length === 0;
                 }
+            }
+        }
+    },
+    
+    remoteMiner: {
+        states: [WorkStates.TRAVEL_TO_ROOM, WorkStates.REMOTE_HARVEST],
+        initialState: WorkStates.TRAVEL_TO_ROOM,
+        transitions: {
+            [WorkStates.TRAVEL_TO_ROOM]: {
+                nextState: WorkStates.REMOTE_HARVEST,
+                condition: (creep) => creep.room.name === creep.memory.targetRoom
+            },
+            [WorkStates.REMOTE_HARVEST]: {
+                nextState: WorkStates.TRAVEL_TO_ROOM,
+                condition: (creep) => creep.room.name !== creep.memory.targetRoom
+            }
+        }
+    },
+    
+    remoteHauler: {
+        states: [WorkStates.TRAVEL_TO_ROOM, WorkStates.REMOTE_HAUL, WorkStates.REMOTE_DELIVER],
+        initialState: WorkStates.TRAVEL_TO_ROOM,
+        transitions: {
+            [WorkStates.TRAVEL_TO_ROOM]: {
+                nextState: WorkStates.REMOTE_HAUL,
+                condition: (creep) => creep.room.name === creep.memory.targetRoom && creep.store.getFreeCapacity() > 0
+            },
+            [WorkStates.REMOTE_HAUL]: {
+                nextState: WorkStates.REMOTE_DELIVER,
+                condition: (creep) => creep.store.getFreeCapacity() === 0
+            },
+            [WorkStates.REMOTE_DELIVER]: {
+                nextState: WorkStates.TRAVEL_TO_ROOM,
+                condition: (creep) => creep.store[RESOURCE_ENERGY] === 0
+            }
+        }
+    },
+    
+    reserver: {
+        states: [WorkStates.TRAVEL_TO_ROOM, WorkStates.RESERVE],
+        initialState: WorkStates.TRAVEL_TO_ROOM,
+        transitions: {
+            [WorkStates.TRAVEL_TO_ROOM]: {
+                nextState: WorkStates.RESERVE,
+                condition: (creep) => creep.room.name === creep.memory.targetRoom
+            },
+            [WorkStates.RESERVE]: {
+                nextState: WorkStates.TRAVEL_TO_ROOM,
+                condition: (creep) => creep.room.name !== creep.memory.targetRoom
             }
         }
     }

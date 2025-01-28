@@ -32,6 +32,16 @@ const ExecuteActions = {
                 return ExecutePatrol.execute(creep);
             case 'ATTACK':
                 return ExecuteAttack.execute(creep);
+            case 'TRAVEL_TO_ROOM':
+                return ExecuteTravelToRoom.execute(creep);
+            case 'REMOTE_HARVEST':
+                return ExecuteRemoteHarvest.execute(creep);
+            case 'REMOTE_HAUL':
+                return ExecuteRemoteHaul.execute(creep);
+            case 'REMOTE_DELIVER':
+                return ExecuteRemoteDeliver.execute(creep);
+            case 'RESERVE':
+                return ExecuteReserve.execute(creep);
             default:
                 console.log(`Unknown state ${state} for creep ${creep.name}`);
             }
