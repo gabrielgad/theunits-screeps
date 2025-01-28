@@ -3,31 +3,40 @@ class CreepHarvester {
         // Each source needs 5 work parts total
         const totalWorkPartsNeeded = roomState.sources * 5;
         
-        // Count existing work parts from current harvesters
-        const existingWorkParts = _.sum(Object.values(Game.creeps).filter(creep => 
+        // Get list of all harvesters in this room
+        const roomHarvesters = Object.values(Game.creeps).filter(creep => 
             creep.memory.role === 'harvester' && 
             creep.room.name === roomState.room.name
-        ), creep => creep.getActiveBodyparts(WORK));
+        );
+        
+        // Count existing work parts from current harvesters
+        const existingWorkParts = _.sum(roomHarvesters, creep => 
+            creep.getActiveBodyparts(WORK)
+        );
         
         // Calculate how many more work parts we need
         const workPartsNeeded = Math.max(0, totalWorkPartsNeeded - existingWorkParts);
         
-        if (workPartsNeeded === 0) {
-            return 0; // We have enough work parts
-        }
+        // Get current harvester count
+        const currentHarvesters = roomHarvesters.length;
         
         // Get the best possible body we can make with current energy capacity
         const bestPossibleBody = this.getBody(roomState.energyCapacity);
         const workPartsPerCreep = bestPossibleBody.filter(part => part === WORK).length;
         
-        // Calculate how many harvesters we need with the best possible body
-        const targetHarvesters = Math.ceil(workPartsNeeded / workPartsPerCreep);
+        // Calculate minimum harvesters needed for remaining work parts
+        const additionalHarvestersNeeded = Math.ceil(workPartsNeeded / workPartsPerCreep);
+        
+        // Final target is current harvesters plus additional needed
+        const targetHarvesters = currentHarvesters + additionalHarvestersNeeded;
         
         console.log(`Room ${roomState.room.name} harvester calculation:`, {
             totalWorkPartsNeeded,
             existingWorkParts,
             workPartsNeeded,
+            currentHarvesters,
             workPartsPerCreep,
+            additionalHarvestersNeeded,
             targetHarvesters
         });
         
