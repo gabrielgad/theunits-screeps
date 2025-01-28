@@ -1,8 +1,36 @@
 class CreepRemoteMiner {
     static calculateTarget(roomState) {
-        if (!roomState.room.memory.remoteMiningActive) return 0;
+        // First check if remote mining is active
+        if (!roomState.remoteMiningActive) return 0;
         
-        return roomState.sources || 0;
+        // Don't spawn miners if we still need scouts
+        if (roomState.roomsNeedingScout && roomState.roomsNeedingScout.length > 0) return 0;
+
+        // Get the total number of sources in profitable rooms
+        const profitableRooms = roomState.profitableRooms || [];
+        let totalSourceCount = 0;
+        let currentMinerCount = 0;
+
+        // Count sources in profitable rooms we can see
+        for (const roomName of profitableRooms) {
+            const room = Game.rooms[roomName];
+            if (room) {
+                totalSourceCount += room.find(FIND_SOURCES).length;
+            }
+        }
+
+        // Count current miners
+        for (const name in Game.creeps) {
+            const creep = Game.creeps[name];
+            if (creep.memory.role === 'remoteMiner' && 
+                creep.memory.homeRoom === roomState.room.name &&
+                profitableRooms.includes(creep.memory.targetRoom)) {
+                currentMinerCount++;
+            }
+        }
+
+        // Return how many additional miners we need
+        return Math.max(0, totalSourceCount - currentMinerCount);
     }
 
     static getBody(energy) {
