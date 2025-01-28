@@ -15,15 +15,17 @@ class CreepStateMachine extends StateMachine {
             this.memory[this.name] = {};
         }
         
-        this.memory[this.name].populationTargets = this.memory[this.name].populationTargets || {
+        // Initialize with standardized role names
+        this.memory[this.name].populationTargets = {
             harvester: 0,
             hauler: 0,
             builder: 0,
             upgrader: 0,
             repairer: 0,
-            melee: 0
+            melee: 0  // Only one melee entry
         };
     }
+
 
     run() {
         const roomState = this.analyzeRoomState();
@@ -67,15 +69,16 @@ class CreepStateMachine extends StateMachine {
     }
 
     updatePopulationTargets(roomState) {
-        const targets = this.memory[this.name].populationTargets;
-        
-        targets.harvester = CreepHarvester.calculateTarget(roomState);
-        targets.hauler = CreepHauler.calculateTarget(roomState);
-        targets.melee = CreepMelee.calculateTarget(roomState);
-        targets.builder = CreepBuilder.calculateTarget(roomState);
-        targets.upgrader = CreepUpgrader.calculateTarget(roomState);
-        targets.repairer = CreepRepairer.calculateTarget(roomState);
+        const targets = {  // Create a new object instead of modifying existing
+            harvester: CreepHarvester.calculateTarget(roomState),
+            hauler: CreepHauler.calculateTarget(roomState),
+            melee: CreepMelee.calculateTarget(roomState),  // Only one melee calculation
+            builder: CreepBuilder.calculateTarget(roomState),
+            upgrader: CreepUpgrader.calculateTarget(roomState),
+            repairer: CreepRepairer.calculateTarget(roomState)
+        };
 
+        // Directly assign the new targets object
         this.memory[this.name].populationTargets = targets;
     }
 
@@ -89,7 +92,7 @@ class CreepStateMachine extends StateMachine {
         const creepTypes = {
             harvester: { Class: CreepHarvester, priority: 1 },
             hauler: { Class: CreepHauler, priority: 1 },
-            melee: { Class: CreepMelee, priority: 2 },
+            melee: { Class: CreepMelee, priority: 2 },  // Consistent casing
             builder: { Class: CreepBuilder, priority: 3 },
             upgrader: { Class: CreepUpgrader, priority: 4 },
             repairer: { Class: CreepRepairer, priority: 3 }
@@ -118,15 +121,13 @@ class CreepStateMachine extends StateMachine {
             
             const result = spawn.spawnCreep(body, name, {
                 memory: {
-                    role: selectedCreep.role,
+                    role: selectedCreep.role.toLowerCase(),  // Ensure consistent casing
                     working: false,
                     room: this.room.name
                 }
             });
     
             console.log('Spawn result:', result);
-        } else {
-            console.log('No creeps needed or no spawns available');
         }
     }
 }
