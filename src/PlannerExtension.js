@@ -12,7 +12,8 @@ class PlannerExtension {
         return currentExtensions < maxExtensions;
     }
 
-    planLayout(spawnPos) {
+    // Renamed from planLayout to findNextPosition to match the calling code
+    findNextPosition(spawnPos) {
         for (let radius = 2; radius < 6; radius++) {
             for (let x = -radius; x <= radius; x++) {
                 for (let y = -radius; y <= radius; y++) {
