@@ -17,11 +17,8 @@ const RemoteMiningStateMachine = class {
     manageRemoteRoom(targetRoomName) {
         const room = Game.rooms[targetRoomName];
         
-        if (!room) {
-            this.requestScout(targetRoomName);
-            return;
-        }
-        
+        if (!room) return;
+
         if (!this.isRoomSafe(room) || !this.isRoomProfitable(room)) {
             this.abandonRoom(targetRoomName);
             return;
@@ -29,16 +26,6 @@ const RemoteMiningStateMachine = class {
 
         this.manageMiningInfrastructure(room);
         this.manageReserver(targetRoomName);
-    }
-
-    requestScout(targetRoomName) {
-        const scoutCount = _.filter(Game.creeps, 
-            creep => creep.memory.role === 'scout' && 
-                    creep.memory.targetRoom === targetRoomName).length;
-        
-        if (scoutCount === 0) {
-            this.room.memory.needsScout = targetRoomName;
-        }
     }
 
     isRoomSafe(room) {
@@ -57,7 +44,6 @@ const RemoteMiningStateMachine = class {
     }
 
     manageMiningInfrastructure(room) {
-        room.memory.remoteMiningActive = true;
         this.manageMiningPositions(room);
     }
 
@@ -101,25 +87,9 @@ const RemoteMiningStateMachine = class {
     }
 
     cleanupMemory() {
-        // Clean up creep memory
         for (const name in Memory.creeps) {
             if (!Game.creeps[name]) {
                 delete Memory.creeps[name];
-            }
-        }
-
-        // Clean up old flag references
-        for (const roomName in this.memory.roomFlags) {
-            const flagData = this.memory.roomFlags[roomName];
-            
-            // Clean up completed scout flags
-            if (flagData.type === 'scout' && Game.rooms[roomName]) {
-                delete this.memory.roomFlags[roomName];
-            }
-            
-            // Clean up old viability checks
-            if (flagData.type === 'viability' && Game.time - flagData.timestamp > 1000) {
-                delete this.memory.roomFlags[roomName];
             }
         }
     }
@@ -136,13 +106,6 @@ const RemoteMiningStateMachine = class {
         this.memory.targetRooms = this.targetRooms;
         delete this.memory.miningPositions[roomName];
         delete this.memory.reserverAssignments[roomName];
-        delete this.memory.roomFlags[roomName];
-        
-        // Remove any debug flags
-        const scoutFlag = Game.flags[`scout_${roomName}`];
-        const viableFlag = Game.flags[`viability_${roomName}`];
-        if (scoutFlag) scoutFlag.remove();
-        if (viableFlag) viableFlag.remove();
     }
 }
 
