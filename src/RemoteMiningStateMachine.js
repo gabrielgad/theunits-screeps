@@ -5,6 +5,8 @@ const RemoteMiningStateMachine = class {
         this.targetRooms = this.memory.targetRooms || [];
         this.memory.miningPositions = this.memory.miningPositions || {};
         this.memory.reserverAssignments = this.memory.reserverAssignments || {};
+        this.memory.roomsNeedingScout = this.memory.roomsNeedingScout || new Set();
+        this.memory.profitableRooms = this.memory.profitableRooms || new Set();
     }
 
     run() {
@@ -17,9 +19,25 @@ const RemoteMiningStateMachine = class {
     manageRemoteRoom(targetRoomName) {
         const room = Game.rooms[targetRoomName];
         
-        if (!room) return;
+        // If we can't see the room, mark it for scouting
+        if (!room) {
+            this.memory.roomsNeedingScout.add(targetRoomName);
+            return;
+        }
 
-        if (!this.isRoomSafe(room) || !this.isRoomProfitable(room)) {
+        // Once we can see the room, remove it from scouting needs
+        this.memory.roomsNeedingScout.delete(targetRoomName);
+
+        if (!this.isRoomSafe(room)) {
+            this.abandonRoom(targetRoomName);
+            return;
+        }
+
+        // Check profitability and update flags accordingly
+        if (this.isRoomProfitable(room)) {
+            this.memory.profitableRooms.add(targetRoomName);
+        } else {
+            this.memory.profitableRooms.delete(targetRoomName);
             this.abandonRoom(targetRoomName);
             return;
         }
@@ -41,6 +59,14 @@ const RemoteMiningStateMachine = class {
         const energyPerTick = sources.length * 10;
         const tripTime = distance * 2;
         return energyPerTick > (tripTime * 0.5);
+    }
+
+    getRoomsNeedingScout() {
+        return Array.from(this.memory.roomsNeedingScout);
+    }
+
+    getProfitableRooms() {
+        return Array.from(this.memory.profitableRooms);
     }
 
     manageMiningInfrastructure(room) {
@@ -98,6 +124,8 @@ const RemoteMiningStateMachine = class {
         if (!this.targetRooms.includes(roomName)) {
             this.targetRooms.push(roomName);
             this.memory.targetRooms = this.targetRooms;
+            // When adding a new target room, it initially needs scouting
+            this.memory.roomsNeedingScout.add(roomName);
         }
     }
 
@@ -106,6 +134,12 @@ const RemoteMiningStateMachine = class {
         this.memory.targetRooms = this.targetRooms;
         delete this.memory.miningPositions[roomName];
         delete this.memory.reserverAssignments[roomName];
+        this.memory.roomsNeedingScout.delete(roomName);
+        this.memory.profitableRooms.delete(roomName);
+    }
+
+    abandonRoom(roomName) {
+        this.removeTargetRoom(roomName);
     }
 }
 
