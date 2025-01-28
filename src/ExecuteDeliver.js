@@ -8,7 +8,7 @@ class ExecuteDeliver {
                         structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0;
             }
         });
-
+        
         if(spawnTarget) {
             if(creep.transfer(spawnTarget, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
                 creep.moveTo(spawnTarget, {
@@ -25,7 +25,7 @@ class ExecuteDeliver {
                        structure.store.getFreeCapacity(RESOURCE_ENERGY) > structure.store.getCapacity(RESOURCE_ENERGY) * 0.2;
             }
         });
-
+        
         if(tower) {
             if(creep.transfer(tower, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
                 creep.moveTo(tower, {
@@ -35,27 +35,50 @@ class ExecuteDeliver {
             return;
         }
 
-        // Third priority: Containers not near sources
-        const containers = creep.room.find(FIND_STRUCTURES, {
+        // Third priority: Containers near controller
+        const controller = creep.room.controller;
+        const controllerContainers = creep.room.find(FIND_STRUCTURES, {
             filter: structure => {
                 if (structure.structureType !== STRUCTURE_CONTAINER) return false;
-                const nearSource = creep.room.find(FIND_SOURCES).some(source => 
-                    structure.pos.getRangeTo(source) <= 2
-                );
-                return !nearSource && structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0;
+                return structure.pos.getRangeTo(controller) <= 3 && 
+                       structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0;
             }
         });
 
-        if(containers.length > 0) {
-            const closestContainer = creep.pos.findClosestByPath(containers);
+        if(controllerContainers.length > 0) {
+            const closestControllerContainer = creep.pos.findClosestByPath(controllerContainers);
+            if(creep.transfer(closestControllerContainer, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                creep.moveTo(closestControllerContainer, {
+                    visualizePathStyle: {stroke: '#ffffff'}
+                });
+            }
+            return;
+        }
+
+        // Fourth priority: Other containers not near sources
+        const otherContainers = creep.room.find(FIND_STRUCTURES, {
+            filter: structure => {
+                if (structure.structureType !== STRUCTURE_CONTAINER) return false;
+                const nearSource = creep.room.find(FIND_SOURCES).some(source =>
+                    structure.pos.getRangeTo(source) <= 2
+                );
+                const nearController = structure.pos.getRangeTo(controller) <= 3;
+                return !nearSource && !nearController && 
+                       structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0;
+            }
+        });
+        
+        if(otherContainers.length > 0) {
+            const closestContainer = creep.pos.findClosestByPath(otherContainers);
             if(creep.transfer(closestContainer, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
                 creep.moveTo(closestContainer, {
                     visualizePathStyle: {stroke: '#ffffff'}
                 });
             }
+            return;
         }
 
-        // Fourth priority: Storage if available
+        // Final priority: Storage if available
         const storage = creep.room.storage;
         if(storage && storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
             if(creep.transfer(storage, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
