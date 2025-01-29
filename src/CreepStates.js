@@ -13,7 +13,8 @@ const WorkStates = {
     REMOTE_DELIVER: 'REMOTE_DELIVER',
     REMOTE_HAUL: 'REMOTE_HAUL',
     RESERVE: 'RESERVE',
-    TRAVEL_TO_ROOM: 'TRAVEL_TO_ROOM'
+    TRAVEL_TO_ROOM: 'TRAVEL_TO_ROOM',
+    SCOUT: 'SCOUT' 
 };
 
 const CreepStates = {
@@ -113,6 +114,26 @@ const CreepStates = {
         }
     },
     
+    scout: {
+        states: [WorkStates.TRAVEL_TO_ROOM, WorkStates.SCOUT],
+        initialState: WorkStates.TRAVEL_TO_ROOM,
+        transitions: {
+            [WorkStates.TRAVEL_TO_ROOM]: {
+                nextState: WorkStates.SCOUT,
+                condition: (creep) => creep.room.name === creep.memory.targetRoom
+            },
+            [WorkStates.SCOUT]: {
+                nextState: WorkStates.TRAVEL_TO_ROOM,
+                condition: (creep) => {
+                    return creep.room.name !== creep.memory.targetRoom || 
+                           (creep.memory.roomAnalysis && 
+                            !creep.memory.roomAnalysis.isProfitable);
+                }
+            }
+        }
+    },
+
+
     remoteMiner: {
         states: [WorkStates.TRAVEL_TO_ROOM, WorkStates.REMOTE_HARVEST],
         initialState: WorkStates.TRAVEL_TO_ROOM,

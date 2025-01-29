@@ -8,6 +8,12 @@ const ExecutePickup = require('ExecutePickup');
 const ExecuteDeliver = require('ExecuteDeliver');
 const ExecutePatrol = require('ExecutePatrol');
 const ExecuteAttack = require('ExecuteAttack');
+const ExecuteTravelToRoom = require('ExecuteTravelToRoom');
+const ExecuteRemoteHarvest = require('ExecuteRemoteHarvest');
+const ExecuteRemoteHaul = require('ExecuteRemoteHaul');
+const ExecuteRemoteDeliver = require('ExecuteRemoteDeliver');
+const ExecuteReserve = require('ExecuteReserve');
+const ExecuteScout = require('ExecuteScout');
 
 const ExecuteActions = {
     executeState(creep, state) {
@@ -42,10 +48,12 @@ const ExecuteActions = {
                 return ExecuteRemoteDeliver.execute(creep);
             case 'RESERVE':
                 return ExecuteReserve.execute(creep);
+            case 'SCOUT':
+                return ExecuteScout.execute(creep);
             default:
                 console.log(`Unknown state ${state} for creep ${creep.name}`);
-            }
         }
-    };
+    }
+};
 
 module.exports = ExecuteActions;
