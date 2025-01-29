@@ -9,37 +9,117 @@ const RemoteMiningStateMachine = class {
         this.memory.profitableRooms = this.memory.profitableRooms || [];
         this.memory.scoutAssignments = this.memory.scoutAssignments || {};
         this.memory.minerAssignments = this.memory.minerAssignments || {};
+        this.memory.lastRoomScan = this.memory.lastRoomScan || 0;
+        this.memory.active = this.memory.active || false; // Track if remote mining is active
     }
 
     run() {
         this.cleanupMemory();
-        this.updateCreepAssignments();
+        
+        // Auto-scan for new rooms every 1000 ticks if remote mining is active
+        if (this.memory.active && Game.time - this.memory.lastRoomScan > 1000) {
+            this.scanForNewTargetRooms();
+            this.memory.lastRoomScan = Game.time;
+        }
         
         for (const targetRoom of this.targetRooms) {
             this.manageRemoteRoom(targetRoom);
         }
+
+        // Update active status based on current state
+        this.updateActiveStatus();
     }
 
-    updateCreepAssignments() {
-        // Clear stale assignments
-        this.memory.scoutAssignments = {};
-        this.memory.minerAssignments = {};
+    updateActiveStatus() {
+        // Remote mining is considered active if we have any target rooms
+        // or if we're actively scanning for new ones
+        const hasTargetRooms = this.targetRooms.length > 0;
+        const hasRoomsNeedingScout = this.memory.roomsNeedingScout.length > 0;
+        const hasProfitableRooms = this.memory.profitableRooms.length > 0;
+        
+        this.memory.active = hasTargetRooms || hasRoomsNeedingScout || hasProfitableRooms;
+    }
 
-        // Update current assignments
-        for (const name in Game.creeps) {
-            const creep = Game.creeps[name];
-            if (creep.memory.homeRoom !== this.room.name) continue;
+    activate() {
+        this.memory.active = true;
+        // Initial scan when activated
+        this.scanForNewTargetRooms();
+    }
 
-            if (creep.memory.role === 'scout') {
-                this.memory.scoutAssignments[creep.memory.targetRoom] = creep.name;
-            }
-            else if (creep.memory.role === 'remoteMiner') {
-                if (!this.memory.minerAssignments[creep.memory.targetRoom]) {
-                    this.memory.minerAssignments[creep.memory.targetRoom] = [];
-                }
-                this.memory.minerAssignments[creep.memory.targetRoom].push(creep.name);
+    deactivate() {
+        this.memory.active = false;
+        // Clear all target rooms when deactivated
+        this.targetRooms.slice().forEach(room => this.removeTargetRoom(room));
+    }
+
+    scanForNewTargetRooms() {
+        // Get exits from current room
+        const exits = Game.map.describeExits(this.room.name);
+        const maxTargetRooms = 3; // Limit number of target rooms
+        
+        // Skip if we already have maximum target rooms
+        if (this.targetRooms.length >= maxTargetRooms) return;
+
+        for (const exitDirection in exits) {
+            const roomName = exits[exitDirection];
+            
+            // Skip if room is already a target
+            if (this.targetRooms.includes(roomName)) continue;
+            
+            // Check if room is suitable for mining
+            if (this.isRoomSuitableForMining(roomName)) {
+                this.addTargetRoom(roomName);
+                
+                // Break if we've reached the maximum
+                if (this.targetRooms.length >= maxTargetRooms) break;
             }
         }
+    }
+
+    isRoomSuitableForMining(roomName) {
+        // Check if room exists and is accessible
+        if (!Game.map.isRoomAvailable(roomName)) return false;
+
+        // Get room status
+        const roomStatus = Game.map.getRoomStatus(roomName);
+        if (!roomStatus || roomStatus.status !== 'normal') return false;
+
+        // Check if room is owned or reserved
+        const roomInfo = Game.map.getRoomCache(roomName) || {};
+        if (roomInfo.owner || roomInfo.reservation) return false;
+
+        // If we can see the room, do additional checks
+        const room = Game.rooms[roomName];
+        if (room) {
+            // Check for hostile structures or creeps
+            if (!this.isRoomSafe(room)) return false;
+
+            // Check if room has sources
+            const sources = room.find(FIND_SOURCES);
+            if (!sources.length) return false;
+
+            // Check if the room would be profitable
+            if (!this.isRoomProfitable(room)) return false;
+        }
+
+        // Calculate linear distance to evaluate if room is too far
+        const [currentX, currentY] = this.parseRoomName(this.room.name);
+        const [targetX, targetY] = this.parseRoomName(roomName);
+        const distance = Math.abs(currentX - targetX) + Math.abs(currentY - targetY);
+        
+        // Reject rooms that are too far away (more than 1 room distance)
+        if (distance > 1) return false;
+
+        return true;
+    }
+
+    parseRoomName(roomName) {
+        const match = roomName.match(/^([WE])([0-9]+)([NS])([0-9]+)$/);
+        if (!match) return [0, 0];
+        
+        const x = (match[1] === 'W' ? -1 : 1) * Number(match[2]);
+        const y = (match[3] === 'N' ? 1 : -1) * Number(match[4]);
+        return [x, y];
     }
 
     manageRemoteRoom(targetRoomName) {
@@ -139,48 +219,6 @@ const RemoteMiningStateMachine = class {
         return this.memory.minerAssignments[roomName] || [];
     }
 
-    manageMiningInfrastructure(room) {
-        this.manageMiningPositions(room);
-    }
-
-    manageMiningPositions(room) {
-        const sources = room.find(FIND_SOURCES);
-        for (const source of sources) {
-            if (!this.memory.miningPositions[source.id]) {
-                const miningPos = this.findOptimalMiningPosition(source);
-                this.memory.miningPositions[source.id] = miningPos;
-            }
-        }
-    }
-
-    findOptimalMiningPosition(source) {
-        const positions = source.room.lookForAtArea(LOOK_TERRAIN, 
-            source.pos.y - 1, source.pos.x - 1,
-            source.pos.y + 1, source.pos.x + 1, true);
-        return positions.find(pos => pos.terrain !== 'wall');
-    }
-
-    manageReserver(targetRoomName) {
-        const room = Game.rooms[targetRoomName];
-        if (!room || !room.controller) return;
-
-        const roomState = {
-            room: room,
-            controller: room.controller,
-            reservation: room.controller.reservation
-        };
-
-        const reserverCount = _.filter(Game.creeps, 
-            creep => creep.memory.role === 'reserver' && 
-                    creep.memory.targetRoom === targetRoomName).length;
-
-        const targetCount = CreepReserver.calculateTarget(roomState);
-
-        if (reserverCount < targetCount) {
-            room.memory.needsReserver = true;
-        }
-    }
-
     cleanupMemory() {
         // Clean up creep memory
         for (const name in Memory.creeps) {
@@ -224,6 +262,7 @@ const RemoteMiningStateMachine = class {
 
     abandonRoom(roomName) {
         this.removeTargetRoom(roomName);
+        this.updateActiveStatus();
     }
 }
 
