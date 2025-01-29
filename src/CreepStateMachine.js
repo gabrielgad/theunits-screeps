@@ -141,14 +141,6 @@ class CreepStateMachine extends StateMachine {
                 homeRoom: this.room.name
             };
 
-            // Assign target room for remote creeps
-            if (selectedCreep.role === 'scout' && roomState.roomsNeedingScout.length > 0) {
-                memory.targetRoom = roomState.roomsNeedingScout[0];
-            } else if ((selectedCreep.role === 'remoteMiner' || selectedCreep.role === 'remoteHauler') 
-                && roomState.profitableRooms.length > 0) {
-                memory.targetRoom = roomState.profitableRooms[0];
-            }
-            
             const result = spawn.spawnCreep(body, name, { memory });
             console.log('Spawn result:', result);
         }

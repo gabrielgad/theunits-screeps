@@ -32,9 +32,6 @@ class CreepHarvester {
 
     static calculateTarget(roomState) {
         const sources = roomState.room.find(FIND_SOURCES);
-        const totalMiningPositions = _.sum(sources, source => 
-            this.getAccessibleMiningPositions(source).length
-        );
         
         // Get current harvesters
         const roomHarvesters = Object.values(Game.creeps).filter(creep => 
@@ -48,41 +45,51 @@ class CreepHarvester {
         );
 
         // Crisis mode detection
-        const isEnergyLow = roomState.energyAvailable < 300; // Can't make 2 WORK harvesters
+        const isEnergyLow = roomState.energyAvailable < 300;
         const noHarvesters = currentHarvesters === 0;
-        const insufficientWorkParts = existingWorkParts < sources.length * 2; // Minimum 2 WORK per source
-
-        if (isEnergyLow && (noHarvesters || insufficientWorkParts)) {
-            // Crisis mode: Ensure at least 1 harvester per source
-            return Math.min(sources.length, totalMiningPositions);
+        
+        if (isEnergyLow && noHarvesters) {
+            // Crisis mode: Need at least one harvester
+            return 1;
         }
 
-        // Normal mode calculation
-        const targetWorkPartsPerSource = 5;
-        const totalWorkPartsNeeded = sources.length * targetWorkPartsPerSource;
+        // Check limiting factors
         
-        // Get best possible body at current energy capacity
-        const bestPossibleBody = this.getBody(roomState.energyCapacity);
-        const workPartsPerCreep = bestPossibleBody.filter(part => part === WORK).length;
-        
-        // Calculate needed harvesters based on work parts
-        const targetHarvesters = Math.min(
-            Math.ceil(totalWorkPartsNeeded / workPartsPerCreep),
-            totalMiningPositions, // Never exceed available positions
-            4 // Hard cap at 4 harvesters until room level increases
+        // 1. Physical space limit
+        const totalMiningPositions = _.sum(sources, source => 
+            this.getAccessibleMiningPositions(source).length
         );
+        if (currentHarvesters >= totalMiningPositions) {
+            return currentHarvesters; // Can't fit more harvesters
+        }
+
+        // 2. Work parts limit (5 per source)
+        const maxWorkPartsNeeded = sources.length * 5;
+        if (existingWorkParts >= maxWorkPartsNeeded) {
+            return currentHarvesters; // Already have optimal work parts
+        }
+
+        // 3. Energy limit - what size harvester can we build?
+        const bestPossibleBody = this.getBody(roomState.energyCapacity);
+        const workPartsInNewCreep = bestPossibleBody.filter(part => part === WORK).length;
+        
+        // If adding a new harvester would exceed max work parts needed, don't add
+        if (existingWorkParts + workPartsInNewCreep > maxWorkPartsNeeded) {
+            return currentHarvesters;
+        }
 
         console.log(`Room ${roomState.room.name} harvester calculation:`, {
             totalMiningPositions,
             existingWorkParts,
+            maxWorkPartsNeeded,
             currentHarvesters,
-            workPartsPerCreep,
-            targetHarvesters,
+            workPartsInNewCreep,
             isEnergyLow,
             energyAvailable: roomState.energyAvailable
         });
-        
-        return targetHarvesters;
+
+        // No limits reached, need another harvester
+        return currentHarvesters + 1;
     }
     
     static getBody(energy) {
